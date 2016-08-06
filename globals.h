@@ -261,6 +261,12 @@
 #define BOXTYPES		11
 extern const char *boxdesc[];
 
+#ifdef HAVE_DVBAPI
+#define ECMINFO_MODE_OSCAM 	0
+#define ECMINFO_MODE_CCCAM 	1
+#define ECMINFO_MODE_NEWCAMD	2
+#endif
+
 #define EMM_UNIQUE 1
 #define EMM_SHARED 2
 #define EMM_GLOBAL 4
@@ -1578,6 +1584,7 @@ struct s_config
 	int8_t		dvbapi_boxtype;
 	int8_t		dvbapi_pmtmode;
 	int8_t		dvbapi_requestmode;
+	int32_t		dvbapi_ecm_infomode;//ecm.info  format:0 oscam 1 cccam 2 
 	SIDTABBITS	dvbapi_sidtabok;					// positiv services
 	SIDTABBITS	dvbapi_sidtabno;					// negative services
 	int8_t          dvbapi_reopenonzap;

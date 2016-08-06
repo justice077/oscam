@@ -1446,6 +1446,16 @@ void chk_t_dvbapi(char *token, char *value)
 		return;
 	}
 
+	if (!strcmp(token, "ecm_infomode")) {
+		if(strlen(value) == 0) {
+			cfg.dvbapi_ecm_infomode = 0;
+		} else {
+			cfg.dvbapi_ecm_infomode = atoi(value);
+			if(cfg.dvbapi_ecm_infomode > 1)
+				cfg.dvbapi_ecm_infomode = 0;
+		}
+		return;
+	}
 	if (!strcmp(token, "request_mode")) {
 		cfg.dvbapi_requestmode = strToIntVal(value, 0);
 		return;
@@ -2523,6 +2533,8 @@ int32_t write_config(void)
 			fprintf_conf(f, "pmt_mode", "%d\n", cfg.dvbapi_pmtmode);
 		if(cfg.dvbapi_requestmode != 0 || cfg.http_full_cfg)
 			fprintf_conf(f, "request_mode", "%d\n", cfg.dvbapi_requestmode);
+		if(cfg.dvbapi_ecm_infomode)
+			fprintf_conf(f, "ecm_infomode", "%d\n", cfg.dvbapi_ecm_infomode);
 		if(cfg.dvbapi_reopenonzap != 0 || cfg.http_full_cfg)
 			fprintf_conf(f, "reopenonzap", "%d\n", cfg.dvbapi_reopenonzap);
 		if(cfg.dvbapi_delayer != 0 || cfg.http_full_cfg)

@@ -2504,12 +2504,21 @@ void dvbapi_send_dcw(struct s_client *client, ECM_REQUEST *er)
 			if(ecmtxt != NULL && er->selected_reader) {
 				char tmp[25];
 				fprintf(ecmtxt, "caid: 0x%04X\npid: 0x%04X\nprov: 0x%06X\n", er->caid, er->pid, (uint) er->prid);
-				fprintf(ecmtxt, "reader: %s\n", er->selected_reader->label);
-				if (er->selected_reader->typ & R_IS_CASCADING)
-					fprintf(ecmtxt, "from: %s\n", er->selected_reader->device);
+				if (cfg.dvbapi_ecm_infomode == ECMINFO_MODE_OSCAM) {
+					fprintf(ecmtxt, "reader: %s\n", er->selected_reader->label);
+					fprintf(ecmtxt, "from:");
+				}
 				else
-					fprintf(ecmtxt, "from: local\n");
-				fprintf(ecmtxt, "protocol: %s\n", reader_get_type_desc(er->selected_reader, 1));
+					fprintf(ecmtxt,"address:");
+				if (er->selected_reader->typ & R_IS_CASCADING)
+					fprintf(ecmtxt, " %s\n", er->selected_reader->device);
+				else
+					fprintf(ecmtxt, " local\n");
+
+				if (cfg.dvbapi_ecm_infomode == ECMINFO_MODE_OSCAM)
+					fprintf(ecmtxt, "protocol:    %s\n",reader_get_type_desc(er->selected_reader, 1));
+				else
+					fprintf(ecmtxt, "using:   %s\n", reader_get_type_desc(er->selected_reader, 1));
 #ifdef MODULE_CCCAM
 				fprintf(ecmtxt, "hops: %d\n", er->selected_reader->cc_currenthops);
 #endif
