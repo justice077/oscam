@@ -956,6 +956,10 @@ void chk_t_webif(char *token, char *value)
 		cs_strncpy(cfg.http_help_lang, value, sizeof(cfg.http_help_lang));
 		return;
 	}
+	if (!strcmp(token, "httputf8")) {
+		cs_http_use_utf8=atoi(value);
+		return;
+	}
 
 	if (!strcmp(token, "httpcert")) {
 		cs_strncpy(cfg.http_cert, value, sizeof(cfg.http_cert));
@@ -2618,6 +2622,8 @@ int32_t write_config(void)
 			fprintf_conf(f, "httpreadonly", "%d\n", cfg.http_readonly);
 		if(cfg.http_full_cfg)
 			fprintf_conf(f, "httpsavefullcfg", "%d\n", cfg.http_full_cfg);
+		if(cs_http_use_utf8)
+			fprintf_conf(f,"httputf8","%d\n",cs_http_use_utf8);
 #ifdef WITH_SSL
 		if(cfg.http_force_sslv3 || cfg.http_full_cfg)
 			fprintf_conf(f, "httpforcesslv3", "%d\n", cfg.http_force_sslv3);

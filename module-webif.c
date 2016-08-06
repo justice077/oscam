@@ -771,6 +771,9 @@ static char *send_oscam_config_monitor(struct templatevars *vars, struct uripara
 	else
 		tpl_addVar(vars, TPLADD, "HTTPHELPLANG", "en");
 
+	if(cs_http_use_utf8)
+		tpl_addVar(vars,TPLADD,"HTTPUTF8","selected");
+
 	tpl_printf(vars, TPLADD, "HTTPREFRESH", "%d", cfg.http_refresh);
 	tpl_addVar(vars, TPLADD, "HTTPTPL", cfg.http_tpl);
 	tpl_addVar(vars, TPLADD, "HTTPSCRIPT", cfg.http_script);
