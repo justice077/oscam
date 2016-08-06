@@ -1533,6 +1533,7 @@ struct s_config
 	int8_t     		cc_forward_origin_card;
 	int8_t			cc_use_fixed_nodeid;
 	uint8_t			cc_fixed_nodeid[8];
+	char		*cc_cfgfile;	//cccam.cfg file path
 #endif
 	char			gbox_hostname[128];
 	char			gbox_key[10];
