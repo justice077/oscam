@@ -170,6 +170,7 @@ extern void chk_reader(char *token, char *value, struct s_reader *rdr);
 extern void chk_t_dvbapi(char *token, char *value);
 extern void dvbapi_chk_caidtab(char *caidasc, char type);
 extern void dvbapi_read_priority(void);
+extern void dvbapi_main_exit();
 
 extern void chk_t_webif(char *token, char *value);
 

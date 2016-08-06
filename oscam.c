@@ -1048,8 +1048,13 @@ void cs_exit(int32_t sig)
 	cs_log("cardserver down");
 	cs_close_log();
 
-	if (sig == SIGINT)
+	if (sig == SIGINT){
+#ifdef HAVE_DVBAPI
+		dvbapi_main_exit();
+#endif
+
 		exit(sig);
+	}
 
 	cs_cleanup();
 

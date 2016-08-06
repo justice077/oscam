@@ -33,6 +33,8 @@ LLIST *channel_cache;
 struct s_dvbapi_priority *dvbapi_priority=NULL;
 struct s_client *dvbapi_client=NULL;
 
+int32_t priority_is_changed=0;
+
 struct s_channel_cache {
 	uint16_t	caid;
 	uint32_t 	prid;
@@ -743,6 +745,8 @@ void dvbapi_start_descrambling(int32_t demux_id) {
 		if (last_pidindex != -1)
 			dvbapi_stop_filter(demux_id, TYPE_EMM);
 		dvbapi_start_filter(demux_id, demux[demux_id].pidindex, 0x001, 0x001, 0x01, 0xFF, 0, TYPE_EMM, 0); //CAT
+
+	dvbapi_adjust_prioritytab(demux_id);
 	}
 }
 
@@ -871,6 +875,7 @@ void dvbapi_read_priority(void) {
 		}
 
 		entry->type=type;
+		entry->last=NULL;
 		entry->next=NULL;
 
 		count++;
@@ -889,6 +894,7 @@ void dvbapi_read_priority(void) {
 			} else {
  				struct s_dvbapi_priority *p;
 				for (p = dvbapi_priority; p->next != NULL; p = p->next);
+				entry->last = p;
 				p->next = entry;
 			}
 			continue;
@@ -897,7 +903,7 @@ void dvbapi_read_priority(void) {
 
 		char c_srvid[34];
 		c_srvid[0]='\0';
-		uint32_t caid=0, provid=0, srvid=0, ecmpid=0, chid=0;
+		uint32_t caid=0, provid=0xFFFFFF, srvid=0, ecmpid=0, chid=0;
 		sscanf(str1, "%4x:%6x:%33[^:s]:%4x:%4x", &caid, &provid, c_srvid, &ecmpid, &chid);
 
 		entry->caid=caid;
@@ -946,6 +952,7 @@ void dvbapi_read_priority(void) {
 					} else {
  						struct s_dvbapi_priority *p;
 						for (p = dvbapi_priority; p->next != NULL; p = p->next);
+						entry2->last = p;
 						p->next = entry2;
 					}
 				}
@@ -960,11 +967,29 @@ void dvbapi_read_priority(void) {
 		cs_debug_mask(D_DVBAPI, "prio: ret=%d | %c: %04X %06X %04X %04X %04X -> map %04X %06X | prio %d | delay %d",
 			ret, entry->type, entry->caid, entry->provid, entry->srvid, entry->ecmpid, entry->chid, entry->mapcaid, entry->mapprovid, entry->force, entry->delay);
 
+		struct s_dvbapi_priority *p;
+		int32_t found=0;
+		for (p = dvbapi_priority;p != NULL && p->next != NULL; p = p->next){
+			if (p->type != entry->type) continue;
+			if (p->caid 	&& p->caid 	!= entry->caid)		continue;
+			if (p->provid != 0xFFFFFF && p->provid != entry->provid)	continue;
+			if (p->ecmpid 	&& p->ecmpid 	!= entry->ecmpid)	continue;
+			if (p->srvid 	&& p->srvid	!= entry->srvid)	continue;
+			if (p->chid	&& p->chid 	!= entry->chid)		continue;
+			found=1;
+			break;
+		}
+		if(found){
+			free(entry);
+			continue;
+		}
+
 		if (!dvbapi_priority) {
 			dvbapi_priority=entry;
 		} else {
  			struct s_dvbapi_priority *p;
 			for (p = dvbapi_priority; p->next != NULL; p = p->next);
+			entry->last=p;
 			p->next = entry;
 		}
 	}
@@ -975,6 +1000,72 @@ void dvbapi_read_priority(void) {
 	return;
 }
 
+int32_t dvbapi_write_prio() {
+	FILE *fp;
+	char token[128];
+
+	const char *cs_prio="oscam.dvbapi";
+
+	if(!priority_is_changed || !dvbapi_priority )return 0;
+
+	snprintf(token, 127, "%s%s", cs_confdir, cs_prio);
+	fp=fopen(token, "w");
+
+	if (!fp) {
+		cs_log("can't open priority file %s to write", token);
+		return -1;
+	}
+	struct s_dvbapi_priority *p;
+	for (p=dvbapi_priority; p != NULL;p=p->next) {
+#ifdef WITH_STAPI
+		if(p->type == 's'){
+			fprintf(fp,"%c: %s";p->type,p->devname);
+			if(p->pmtfile[0])
+				fprintf(fp," %s",p->pmtfile);
+			if(p->disablefilter)
+				fprintf(fp," %d",p->disablefilter);
+			fprintf(fp,"\n");
+			continue;
+		}
+#endif
+
+		fprintf(fp,"%c: %04X",p->type,p->caid);
+		int loop=0;
+		for(loop=0;loop<1;loop++){
+			if(p->provid == 0xFFFFFF)continue;
+			fprintf(fp,":%06X",p->provid);
+			if(p->ecmpid==0)continue;
+			fprintf(fp,":%04X",p->ecmpid);
+			if(p->srvid == 0)continue;
+			fprintf(fp,":%04X",p->srvid);
+			if(p->chid)
+				fprintf(fp,":%04X",p->chid);
+		}
+
+		switch (p->type) {
+			case 'd':
+				if(p->delay)
+					fprintf(fp," %4x",p->delay);
+				break;
+			case 'l':
+				if(p->delay)
+					fprintf(fp, " %4d", p->delay);
+				break;
+			case 'p':
+				if(p->force)
+					fprintf(fp, " %1d", p->force);
+				break;
+			case 'm':
+				if(p->mapcaid || p->mapprovid)
+					fprintf(fp, " %04X:%06X", p->mapcaid, p->mapprovid);
+				break;
+		}
+		fprintf(fp,"\n");
+	}
+	fclose(fp);
+	return 0;
+}
+
 struct s_dvbapi_priority *dvbapi_check_prio_match(int32_t demux_id, int32_t pidindex, char type) {
 	struct s_dvbapi_priority *p;
 	struct s_ecmpids *ecmpid = &demux[demux_id].ECMpids[pidindex];
@@ -983,16 +1074,55 @@ struct s_dvbapi_priority *dvbapi_check_prio_match(int32_t demux_id, int32_t pidi
 	for (p=dvbapi_priority, i=0; p != NULL; p=p->next, i++) {
 		if (p->type != type) continue;
 
-		if (p->caid 	&& p->caid 	!= ecmpid->CAID)	continue;
-		if (p->provid && p->provid 	!= ecmpid->PROVID)	continue;
-		if (p->ecmpid	&& p->ecmpid 	!= ecmpid->ECM_PID)	continue;
-		if (p->srvid	&& p->srvid 	!= demux[demux_id].program_number)			continue;
-
+		if (p->caid 	&& p->caid 	!= ecmpid->CAID) continue;
+		if (p->provid != 0xFFFFFF && p->provid != ecmpid->PROVID) continue;
+		if (p->ecmpid	&& p->ecmpid 	!= ecmpid->ECM_PID) continue;
+		if (p->srvid	&& p->srvid 	!= demux[demux_id].program_number) continue;
 		if (p->type == 'i' && p->chid) continue;
 
 		return p;
 	}
 	return NULL;
+
+}
+
+void dvbapi_adjust_prioritytab(int32_t demux_index){
+	int32_t n;
+	struct s_dvbapi_priority *p;
+
+	if (demux[demux_index].ECMpidcount <= 1)
+		return;
+
+	for (n=0;n<demux[demux_index].ECMpidcount;n++){
+		p=dvbapi_check_prio_match(demux_index,n,'p');
+		if(demux[demux_index].ECMpids[n].index<=0 && p != NULL){
+			if(p->last)
+				p->last->next=p->next;
+			if(p->next)
+				p->next->last=p->last;
+			free(p);
+			priority_is_changed = 1;
+		}
+		else if(demux[demux_index].ECMpids[n].index>0 && p == NULL){
+			struct s_dvbapi_priority *entry = malloc(sizeof(struct s_dvbapi_priority));
+			memset(entry, 0, sizeof(struct s_dvbapi_priority));
+			entry->type='p';
+			entry->caid=demux[demux_index].ECMpids[n].CAID;
+			entry->provid=demux[demux_index].ECMpids[n].PROVID;
+
+			entry->last=NULL;
+			entry->next=NULL;
+			if (!dvbapi_priority) {
+				dvbapi_priority=entry;
+			} else {
+				for (p = dvbapi_priority; p->next != NULL; p = p->next);
+				entry->last=p;
+				p->next = entry;
+			}
+
+			priority_is_changed = 1;
+		}
+	}
 
 }
 
@@ -1623,6 +1753,7 @@ void dvbapi_chk_caidtab(char *caidasc, char type) {
 
 			entry->type=type;
 
+			entry->last=NULL;
 			entry->next=NULL;
 
 			if (!dvbapi_priority) {
@@ -2140,6 +2271,11 @@ static void * dvbapi_main_local(void *cli) {
 		}
 	}
 	return NULL;
+}
+
+void dvbapi_main_exit()
+{
+	dvbapi_write_prio();
 }
 
 void dvbapi_write_cw(int32_t demux_id, uchar *cw, int32_t index) {
