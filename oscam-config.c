@@ -2943,8 +2943,11 @@ int32_t write_server(void)
 			if (((rdr->typ != R_CCCAM && rdr->tcp_ito != DEFAULT_INACTIVITYTIMEOUT) || (rdr->typ == R_CCCAM && rdr->tcp_ito != 30) || cfg.http_full_cfg) && !isphysical)
 				fprintf_conf(f, "inactivitytimeout", "%d\n", rdr->tcp_ito);
 
-			if ((rdr->resetcycle != 0 || cfg.http_full_cfg) && isphysical)
+			if ((rdr->resetcycle != 0 || cfg.http_full_cfg))
 				fprintf_conf(f, "resetcycle", "%d\n", rdr->resetcycle);
+
+			if ((rdr->resetcycle_nok != 0 || cfg.http_full_cfg))
+				fprintf_conf(f, "resetcycle_nok", "%d\n", rdr->resetcycle_nok);
 
 			if ((rdr->tcp_rto != DEFAULT_TCP_RECONNECT_TIMEOUT || cfg.http_full_cfg) && !isphysical)
 				fprintf_conf(f, "reconnecttimeout", "%d\n", rdr->tcp_rto);
@@ -3202,6 +3205,9 @@ int32_t write_server(void)
 				fprintf_conf(f, "cooldown", "%d,%d\n", rdr->cooldown[0], rdr->cooldown[1]);
 			}
 
+			if (rdr->autorestartseconds || cfg.http_full_cfg ){
+				fprintf_conf(f, "autorestartseconds", "%d\n", rdr->autorestartseconds);
+			}
 			fprintf(f, "\n");
 		}
 	}
@@ -4125,6 +4131,11 @@ void chk_reader(char *token, char *value, struct s_reader *rdr)
 		return;
 	}
 
+	if (!strcmp(token, "resetcycle_nok")) {
+		rdr->resetcycle_nok  = strToIntVal(value, 0);
+		return;
+	}
+
 	if (!strcmp(token, "reconnecttimeout")) {
 		rdr->tcp_rto  = strToIntVal(value, DEFAULT_TCP_RECONNECT_TIMEOUT);
 		return;
@@ -4831,6 +4842,11 @@ void chk_reader(char *token, char *value, struct s_reader *rdr)
 		return;
 	}
 #endif
+
+	if (!strcmp(token, "autorestartseconds")) {
+		rdr->autorestartseconds=strToIntVal(value,0);
+		return;
+	}
 
 	//ratelimit
 	if (!strcmp(token, "ratelimitecm")) {

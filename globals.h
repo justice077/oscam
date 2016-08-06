@@ -1052,6 +1052,8 @@ struct s_reader  									//contains device info, reader info and card info
 	uint8_t		changes_since_shareupdate;
 	int32_t			resetcycle;						// ECM until reset
 	int32_t			resetcounter;					// actual count
+	int32_t			resetcycle_nok;						// nok until reset
+	int32_t			resetcounter_nok;					// actual nok count
 	uint32_t		auprovid;						// AU only for this provid
 	int8_t			audisabled;						// exclude reader from auto AU
 	int8_t			smargopatch;
@@ -1269,6 +1271,7 @@ struct s_reader  									//contains device info, reader info and card info
 	struct s_sc8in1_config *sc8in1_config;
 	uint8_t			sc8in1_dtrrts_patch; // fix for kernel commit 6a1a82df91fa0eb1cc76069a9efe5714d087eccd
 
+	uint32_t		autorestartseconds;		// auto restart reader after login ,default 0  disable
 #ifdef MODULE_PANDORA
 	int8_t			pand_send_ecm;
 #endif

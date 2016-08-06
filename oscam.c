@@ -2231,11 +2231,26 @@ int32_t write_ecm_answer(struct s_reader * reader, ECM_REQUEST *er, int8_t rc, u
 			rdr_log(reader, "Resetting reader, resetcyle of %d ecms reached", reader->resetcycle);
 			reader->card_status = CARD_NEED_INIT;
 #ifdef WITH_CARDREADER
+			//reader_reset(reader);
+			add_job(cl, ACTION_READER_RESET, NULL, 0);
+#endif
+		}
+	}
+	else
+	if (reader && rc == E_NOTFOUND && (rcEx == E2_CCCAM_NOK1 || rcEx == E2_CCCAM_NOK2) && reader->resetcycle_nok > 0)
+	{
+		reader->resetcounter_nok++;
+		if (reader->resetcounter_nok > reader->resetcycle_nok) {
+			reader->resetcounter_nok = 0;
+			rdr_log(reader, "Resetting reader, resetcyle of %d NOK ecms reached", reader->resetcycle_nok);
+			reader->card_status = CARD_NEED_INIT;
+#ifdef WITH_CARDREADER
       			//reader_reset(reader);
       			add_job(cl, ACTION_READER_RESET, NULL, 0);
 #endif
 		}
 	}
+
 
 	return res;
 }
@@ -3776,7 +3791,8 @@ static void check_status(struct s_client *cl) {
 			//check for card inserted or card removed on pysical reader
 			if (!rdr || !rdr->enable)
 				break;
-			add_job(cl, ACTION_READER_CHECK_HEALTH, NULL, 0);
+			reader_checkhealth(rdr);
+//			add_job(cl, ACTION_READER_CHECK_HEALTH, NULL, 0);
 			break;
 #endif
 		case 'p':
@@ -4487,6 +4503,17 @@ void * reader_check(void) {
 		for (cl=first_client->next; cl ; cl=cl->next) {
 			if (!cl->thread_active)
 				check_status(cl);
+			struct s_reader *rdr=cl->reader;
+			if (rdr && rdr->autorestartseconds
+			    && (cl->login + (time_t)rdr->autorestartseconds) < time(NULL)){
+				if(rdr->enable){
+					rdr->enable=0;
+					kill_thread(cl);
+					cs_sleepms(cfg.reader_restart_seconds * 1000);
+				}
+				rdr->enable=1;
+				restart_cardreader(rdr, 1);
+			}
 		}
 		cs_readlock(&readerlist_lock);
 		for (rdr=first_active_reader; rdr; rdr=rdr->next) {
