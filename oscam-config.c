@@ -1760,6 +1760,7 @@ int32_t init_config(void)
 	cfg.cc_keep_connected = 1;
 	cfg.cc_cfgfile = NULL;
 	cfg.cc_reshare = 10;
+	cfg.cc_autosidblock = 1;
 #endif
 
 #ifdef WITH_LB
@@ -2508,6 +2509,8 @@ int32_t write_config(void)
 				cfg.cc_fixed_nodeid[4], cfg.cc_fixed_nodeid[5], cfg.cc_fixed_nodeid[6], cfg.cc_fixed_nodeid[7]);
 		if(cfg.cc_reshare_services != 0 || cfg.http_full_cfg)
 			fprintf_conf(f, "reshare_mode", "%d\n", cfg.cc_reshare_services);
+		if(!cfg.cc_autosidblock)
+			fprintf_conf(f, "autosidblock","%d\n",cfg.cc_autosidblock);
 		if(cfg.cc_cfgfile && cfg.cc_cfgfile[0])
 			fprintf_conf(f, "cccamcfgfile","%s\n",cfg.cc_cfgfile);
 		fprintf(f,"\n");

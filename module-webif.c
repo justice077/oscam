@@ -689,6 +689,8 @@ static char *send_oscam_config_cccam(struct templatevars *vars, struct uriparams
 	if (cfg.cc_keep_connected)
 		tpl_printf(vars, TPLADD, "KEEPCONNECTED", "selected");
 
+	if (cfg.cc_autosidblock)
+		tpl_printf(vars, TPLADD, "AUTOSIDBLOCK", "selected");
 
 	return tpl_getTpl(vars, "CONFIGCCCAM");
 }

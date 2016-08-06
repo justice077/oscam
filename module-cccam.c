@@ -2462,7 +2462,7 @@ int32_t cc_parse_msg(struct s_client *cl, uint8_t *buf, int32_t l) {
 				else if (cc->cmd05NOK)
 				{
 					move_card_to_end(cl, card);
-					if (cwlastresptime < 5000)
+					if (cwlastresptime < 5000 && cfg.cc_autosidblock)
 						add_sid_block(cl, card, &srvid);
 					else
 						card->rating--;
@@ -2475,7 +2475,7 @@ int32_t cc_parse_msg(struct s_client *cl, uint8_t *buf, int32_t l) {
 					if (!is_good_sid(card, &srvid))
 					{
 						move_card_to_end(cl, card);
-						if (cwlastresptime < 5000)
+						if (cwlastresptime < 5000 && cfg.cc_autosidblock)
 							add_sid_block(cl, card, &srvid);
 						else
 							card->rating--;
@@ -2667,7 +2667,8 @@ int32_t cc_parse_msg(struct s_client *cl, uint8_t *buf, int32_t l) {
 						cs_debug_mask(D_READER, "%s null dcw received! sid=%04X(%d)", getprefix(),
 								srvid.sid, srvid.ecmlen);
 						move_card_to_end(cl, card);
-						add_sid_block(cl, card, &srvid);
+						if (cfg.cc_autosidblock)
+							add_sid_block(cl, card, &srvid);
 						//ecm retry:
 						cc_reset_pending(cl, ecm_idx);
 						buf[1] = MSG_CW_NOK2; //So it's really handled like a nok!
