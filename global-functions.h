@@ -33,6 +33,7 @@ extern void reader_videoguard2(struct s_cardsystem *);
 extern void reader_videoguard12(struct s_cardsystem *);
 extern void reader_dre(struct s_cardsystem *);
 extern void reader_tongfang(struct s_cardsystem *);
+extern void reader_streamguard(struct s_cardsystem *);
 extern void reader_bulcrypt(struct s_cardsystem *);
 
 /* ===========================

@@ -292,6 +292,7 @@ static void usage(void)
 	_check(READER_VIDEOGUARD, "videoguard");
 	_check(READER_DRE, "dre");
 	_check(READER_TONGFANG, "tongfang");
+	_check(READER_STREAMGUARD, "streamguard");
 	_check(READER_BULCRYPT, "bulcrypt");
 	printf("\n");
 
@@ -4702,6 +4703,9 @@ int32_t main (int32_t argc, char *argv[])
 #endif
 #ifdef READER_TONGFANG
 	reader_tongfang,
+#endif
+#ifdef READER_STREAMGUARD
+	reader_streamguard,
 #endif
 #ifdef READER_BULCRYPT
 	reader_bulcrypt,

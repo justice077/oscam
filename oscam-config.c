@@ -3262,6 +3262,7 @@ void write_versionfile(void) {
 		write_conf(READER_VIDEOGUARD, "NDS Videoguard");
 		write_conf(READER_DRE, "DRE Crypt");
 		write_conf(READER_TONGFANG, "TONGFANG");
+		write_conf(READER_STREAMGUARD, "STREAMGUARD");
 		write_conf(READER_BULCRYPT, "Bulcrypt");
 	}
 	fclose(fp);

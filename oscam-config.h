@@ -143,6 +143,10 @@
 #define READER_TONGFANG
 #endif
 
+#ifndef READER_STREAMGUARD
+#define READER_STREAMGUARD
+#endif
+
 #ifndef READER_BULCRYPT
 #define READER_BULCRYPT
 #endif
