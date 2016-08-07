@@ -5355,6 +5355,7 @@ int32_t init_readerdb(void)
 			rdr->deprecated = 0;
 			rdr->force_irdeto = 0;
 #ifdef MODULE_CCCAM
+			rdr->cc_keepalive = DEFAULT_CC_KEEPALIVE;
 			rdr->cc_reshare = DEFAULT_CC_RESHARE;
 			rdr->cc_maxhop  = DEFAULT_CC_MAXHOP;
 			rdr->cc_mindown = 0;

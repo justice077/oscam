@@ -326,7 +326,7 @@ extern const char *boxdesc[];
 #define DEFAULT_LB_MODE 0
 #define DEFAULT_LB_STAT_CLEANUP 336
 #define DEFAULT_LB_REOPEN_MODE 0
-#define DEFAULT_UPDATEINTERVAL 240
+#define DEFAULT_UPDATEINTERVAL 120
 #define DEFAULT_LB_AUTO_BETATUNNEL 1
 #define DEFAULT_LB_AUTO_BETATUNNEL_PREFER_BETA 50
 #define DEFAULT_CACHEEX_WAIT_TIME 50
@@ -460,7 +460,7 @@ struct s_arm_led {
 #define DEFAULT_CC_RESHARE  -1 // Use global cfg
 #define DEFAULT_CC_IGNRSHR  -1 // Use global cfg
 #define DEFAULT_CC_STEALTH  -1 // Use global cfg
-#define DEFAULT_CC_KEEPALIVE 0
+#define DEFAULT_CC_KEEPALIVE 1
 #define DEFAULT_CC_RECONNECT 12000
 #endif
 
