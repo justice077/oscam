@@ -52,7 +52,7 @@
 #endif
 
 #ifndef MODULE_CAMD33
-//#define MODULE_CAMD33
+#define MODULE_CAMD33
 #endif
 
 #ifndef MODULE_CAMD35
