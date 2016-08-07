@@ -1,14 +1,36 @@
 #include "globals.h"
 #ifdef MODULE_MONITOR
+#include "cscrypt/md5.h"
+#include "module-monitor.h"
+#include "oscam-aes.h"
+#include "oscam-client.h"
+#include "oscam-config.h"
+#include "oscam-conf-chk.h"
+#include "oscam-net.h"
+#include "oscam-reader.h"
+#include "oscam-string.h"
+#include "oscam-work.h"
 
 extern char *entitlement_type[];
+extern char *loghist;
+extern char *loghistptr;
+
+struct monitor_data {
+	bool			auth;
+	uint8_t			ucrc[4];
+	struct aes_keys	aes_keys;
+	int32_t			seq;
+	int32_t			counter;
+	char			btxt[256];
+};
 
 static int8_t monitor_check_ip(void)
 {
 	int32_t ok=0;
 	struct s_client *cur_cl = cur_client();
+	struct monitor_data *module_data = cur_cl->module_data;
 
-	if (cur_cl->auth) return 0;
+	if (module_data->auth) return 0;
 	ok = check_ip(cfg.mon_allowed, cur_cl->ip);
 	if (!ok)
 	{
@@ -22,21 +44,21 @@ static int8_t monitor_auth_client(char *usr, char *pwd)
 {
 	struct s_auth *account;
 	struct s_client *cur_cl = cur_client();
+	struct monitor_data *module_data = cur_cl->module_data;
 
-	if (cur_cl->auth) return 0;
+	if (module_data->auth) return 0;
 	if ((!usr) || (!pwd))
 	{
 		cs_auth_client(cur_cl, (struct s_auth *)0, NULL);
 		return -1;
 	}
-	for (account=cfg.account, cur_cl->auth=0; (account) && (!cur_cl->auth);)
-	{
-		if (account->monlvl)
-			cur_cl->auth=!(strcmp(usr, account->usr) | strcmp(pwd, account->pwd));
-		if (!cur_cl->auth)
-			account=account->next;
+	for (account = cfg.account; account; account = account->next) {
+		if (account->monlvl && streq(usr, account->usr) && streq(pwd, account->pwd)) {
+			module_data->auth = 1;
+			break;
+		}
 	}
-	if (!cur_cl->auth)
+	if (!module_data->auth)
 	{
 		cs_auth_client(cur_cl, (struct s_auth *)0, "invalid account");
 		return -1;
@@ -51,164 +73,133 @@ static int32_t secmon_auth_client(uchar *ucrc)
 	uint32_t crc;
 	struct s_auth *account;
 	struct s_client *cur_cl = cur_client();
+	struct monitor_data *module_data = cur_cl->module_data;
 	unsigned char md5tmp[MD5_DIGEST_LENGTH];
 
-	if (cur_cl->auth)
+	if (module_data->auth)
 	{
-		int32_t s=memcmp(cur_cl->ucrc, ucrc, 4);
+		int32_t s=memcmp(module_data->ucrc, ucrc, 4);
 		if (s)
 			cs_log("wrong user-crc or garbage !?");
-		return(!s);
+		return !s;
 	}
 	cur_cl->crypted=1;
 	crc=(ucrc[0]<<24) | (ucrc[1]<<16) | (ucrc[2]<<8) | ucrc[3];
-	for (account=cfg.account; (account) && (!cur_cl->auth); account=account->next)
+	for (account=cfg.account; (account) && (!module_data->auth); account=account->next)
 		if ((account->monlvl) &&
 				(crc==crc32(0L, MD5((unsigned char *)account->usr, strlen(account->usr), md5tmp), MD5_DIGEST_LENGTH)))
 		{
-			memcpy(cur_cl->ucrc, ucrc, 4);
-			aes_set_key((char *)MD5((unsigned char *)account->pwd, strlen(account->pwd), md5tmp));
+			memcpy(module_data->ucrc, ucrc, 4);
+			aes_set_key(&module_data->aes_keys, (char *)MD5((unsigned char *)ESTR(account->pwd), strlen(ESTR(account->pwd)), md5tmp));
 			if (cs_auth_client(cur_cl, account, NULL))
 				return -1;
-			cur_cl->auth=1;
+			module_data->auth=1;
 		}
-	if (!cur_cl->auth)
+	if (!module_data->auth)
 	{
 		cs_auth_client(cur_cl, (struct s_auth *)0, "invalid user");
 		return -1;
 	}
-	return(cur_cl->auth);
+	return module_data->auth;
 }
 
 int32_t monitor_send_idx(struct s_client *cl, char *txt)
 {
+	struct monitor_data *module_data = cl->module_data;
 	int32_t l;
 	unsigned char buf[256+32];
 	if (!cl->udp_fd)
-		return(-1);
+		return -1;
 	struct timespec req_ts;
 	req_ts.tv_sec = 0;
 	req_ts.tv_nsec = 500000;
 	nanosleep (&req_ts, NULL);//avoid lost udp-pakkets
 	if (!cl->crypted)
-		return(sendto(cl->udp_fd, txt, strlen(txt), 0,
-				(struct sockaddr *)&cl->udp_sa,
-				sizeof(cl->udp_sa)));
+		return sendto(cl->udp_fd, txt, strlen(txt), 0, (struct sockaddr *)&cl->udp_sa, cl->udp_sa_len);
 	buf[0]='&';
 	buf[9]=l=strlen(txt);
 	l=boundary(4, l+5)+5;
-	memcpy(buf+1, cl->ucrc, 4);
+	memcpy(buf+1, module_data->ucrc, 4);
 	cs_strncpy((char *)buf+10, txt, sizeof(buf)-10);
 	uchar tmp[10];
 	memcpy(buf+5, i2b_buf(4, crc32(0L, buf+10, l-10), tmp), 4);
-	aes_encrypt_idx(cl, buf+5, l-5);
-	return(sendto(cl->udp_fd, buf, l, 0,
-			(struct sockaddr *)&cl->udp_sa,
-			sizeof(cl->udp_sa)));
+	aes_encrypt_idx(&module_data->aes_keys, buf+5, l-5);
+	return sendto(cl->udp_fd, buf, l, 0, (struct sockaddr *)&cl->udp_sa, cl->udp_sa_len);
 }
 
 #define monitor_send(t) monitor_send_idx(cur_client(), t)
 
-static int32_t monitor_recv(struct s_client * client, uchar *buf, int32_t l)
+static int32_t monitor_recv(struct s_client * client, uchar *buf, int32_t UNUSED(buflen))
 {
-	int32_t n;
-	uchar nbuf[3] = { 'U', 0, 0 };
-	static int32_t bpos=0, res = 0;
-	static uchar *bbuf=NULL;
-	if (!bbuf)
-	{
-		bbuf = cs_malloc(&bbuf, l, 1);
-	}
-	if (bpos)
-		memcpy(buf, bbuf, n=bpos);
-	else
-		n=recv_from_udpipe(buf);
-	bpos=0;
-	if (!n) return(buf[0]=0);
+	int32_t n = recv_from_udpipe(buf);
+	if (!n)
+		return buf[0]=0;
+	if (!client->module_data && !cs_malloc(&client->module_data, sizeof(struct monitor_data)))
+		return 0;
 	if (buf[0]=='&')
 	{
 		int32_t bsize;
 		if (n<21)	// 5+16 is minimum
 		{
 			cs_log("packet too small!");
-			return(buf[0]=0);
+			return buf[0]=0;
 		}
-		res = secmon_auth_client(buf+1);
+		int32_t res = secmon_auth_client(buf+1);
 		if (res == -1) {
 			cs_disconnect_client(client);
 			return 0;
 		}
-		if (!res)
-			return(buf[0]=0);
-		aes_decrypt(client, buf+5, 16);
-		bsize=boundary(4, buf[9]+5)+5;
-		// cs_log("n=%d bsize=%d", n, bsize);
-		if (n>bsize)
-		{
-			// cs_log("DO >>>> copy-back");
-			memcpy(bbuf, buf+bsize, bpos=n-bsize);
-			n=bsize;
-			//write_to_pipe(client->fd_m2c, PIP_ID_UDP, (uchar*)&nbuf, sizeof(nbuf));
-			uchar *nbuf_cpy = cs_malloc(&nbuf_cpy, sizeof(nbuf), 0);
-			memcpy(nbuf_cpy, nbuf, sizeof(nbuf));
-			add_job(client, ACTION_CLIENT_UDP, &nbuf_cpy, sizeof(nbuf));
+		if (!res) {
+			return buf[0]=0;
 		}
-		else if (n<bsize)
+		struct monitor_data *module_data = client->module_data;
+		aes_decrypt(&module_data->aes_keys, buf+5, 16);
+		bsize=boundary(4, buf[9]+5)+5;
+		if (n<bsize)
 		{
 			cs_log("packet-size mismatch !");
-			return(buf[0]=0);
+			return buf[0]=0;
 		}
-		aes_decrypt(client, buf+21, n-21);
+		aes_decrypt(&module_data->aes_keys, buf+21, n-21);
 		uchar tmp[10];
 		if (memcmp(buf+5, i2b_buf(4, crc32(0L, buf+10, n-10), tmp), 4))
 		{
 			cs_log("CRC error ! wrong password ?");
-			return(buf[0]=0);
+			return buf[0]=0;
 		}
 		n=buf[9];
 		memmove(buf, buf+10, n);
 	}
 	else
 	{
-		uchar *p;
 		if (monitor_check_ip() == -1) {
 			cs_disconnect_client(client);
 			return 0;
-		}
-		buf[n]='\0';
-		if ((p=(uchar *)strchr((char *)buf, 10)) && (bpos=n-(p-buf)-1))
-		{
-			memcpy(bbuf, p+1, bpos);
-			n=p-buf;
-			//write_to_pipe(client->fd_m2c, PIP_ID_UDP, (uchar*)&nbuf, sizeof(nbuf));
-			uchar *nbuf_cpy = cs_malloc(&nbuf_cpy, sizeof(nbuf), 0);
-			memcpy(nbuf_cpy, nbuf, sizeof(nbuf));
-			add_job(client, ACTION_CLIENT_UDP, &nbuf_cpy, sizeof(nbuf));
 		}
 	}
 	buf[n]='\0';
 	n=strlen(trim((char *)buf));
 	if (n) client->last=time((time_t *) 0);
-	return(n);
+	return n;
 }
 
 static void monitor_send_info(char *txt, int32_t last)
 {
-	static int32_t seq=0, counter=0;
-	static char btxt[256] = {0};
+	struct s_client *cur_cl = cur_client();
+	struct monitor_data *module_data = cur_cl->module_data;
 	char buf[8];
 	if (txt)
 	{
-		if (!btxt[0])
+		if (!module_data->btxt[0])
 		{
-			counter=0;
+			module_data->counter=0;
 			txt[2]='B';
 		}
 		else
-			counter++;
-		snprintf(buf, sizeof(buf), "%03d", counter);
+			module_data->counter++;
+		snprintf(buf, sizeof(buf), "%03d", module_data->counter);
 		memcpy(txt+4, buf, 3);
-		txt[3]='0'+seq;
+		txt[3]='0'+module_data->seq;
 	}
 	else
 		if (!last)
@@ -216,30 +207,30 @@ static void monitor_send_info(char *txt, int32_t last)
 
 	if (!last)
 	{
-		if (btxt[0]) monitor_send(btxt);
-		cs_strncpy(btxt, txt, sizeof(btxt));
+		if (module_data->btxt[0]) monitor_send(module_data->btxt);
+		cs_strncpy(module_data->btxt, txt, sizeof(module_data->btxt));
 		return;
 	}
 
-	if (txt && btxt[0])
+	if (txt && module_data->btxt[0])
 	{
-		monitor_send(btxt);
+		monitor_send(module_data->btxt);
 		txt[2]='E';
-		cs_strncpy(btxt, txt, sizeof(btxt));
+		cs_strncpy(module_data->btxt, txt, sizeof(module_data->btxt));
 	}
 	else
 	{
 		if (txt)
-			cs_strncpy(btxt, txt, sizeof(btxt));
-		btxt[2]=(btxt[2]=='B') ? 'S' : 'E';
+			cs_strncpy(module_data->btxt, txt, sizeof(module_data->btxt));
+		module_data->btxt[2]=(module_data->btxt[2]=='B') ? 'S' : 'E';
 	}
 
-	if (btxt[0])
+	if (module_data->btxt[0])
 	{
-		monitor_send(btxt);
-		seq=(seq+1)%10;
+		monitor_send(module_data->btxt);
+		module_data->seq=(module_data->seq+1)%10;
 	}
-	btxt[0]=0;
+	module_data->btxt[0]=0;
 }
 
 static char *monitor_client_info(char id, struct s_client *cl, char *sbuf){
@@ -253,9 +244,9 @@ static char *monitor_client_info(char id, struct s_client *cl, char *sbuf){
 		struct tm lt;
 		now=time((time_t*)0);
 
-		if	((cfg.mon_hideclient_to <= 0) ||
-				(now-cl->lastecm < cfg.mon_hideclient_to) ||
-				(now-cl->lastemm < cfg.mon_hideclient_to) ||
+		if	((cfg.hideclient_to <= 0) ||
+				(now-cl->lastecm < cfg.hideclient_to) ||
+				(now-cl->lastemm < cfg.hideclient_to) ||
 				(cl->typ != 'c'))
 		{
 			lsec = now - cl->login;
@@ -272,11 +263,11 @@ static char *monitor_client_info(char id, struct s_client *cl, char *sbuf){
 			// no AU reader == 0 / AU ok == 1 / Last EMM > aulow == -1
 			if(cl->typ == 'c' || cl->typ == 'p' || cl->typ == 'r') {
 
-				if ((cl->typ == 'c' && !cl->aureader_list) ||
+				if ((cl->typ == 'c' && ll_count(cl->aureader_list) == 0) ||
 						((cl->typ == 'p' || cl->typ == 'r') && cl->reader->audisabled))
 					cau = 0;
 
-				else if ((now-cl->lastemm) / 60 > cfg.mon_aulow)
+				else if ((now-cl->lastemm) / 60 > cfg.aulow)
 					cau = (-1);
 
 				else
@@ -305,14 +296,14 @@ static char *monitor_client_info(char id, struct s_client *cl, char *sbuf){
 			snprintf(ltime, sizeof(ldate), "%02d:%02d:%02d", lt.tm_hour, lt.tm_min, lt.tm_sec);
 			snprintf(sbuf, 256, "[%c--CCC]%8X|%c|%d|%s|%d|%d|%s|%d|%s|%s|%s|%d|%04X:%04X|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d\n",
 					id, cl->tid, cl->typ, cnr, usr, cau, cl->crypted,
-					cs_inet_ntoa(cl->ip), cl->port, monitor_get_proto(cl),
+					cs_inet_ntoa(cl->ip), cl->port, client_get_proto(cl),
 					ldate, ltime, lsec, cl->last_caid, cl->last_srvid,
 					get_servicename(cl, cl->last_srvid, cl->last_caid, channame), isec, con,
                                         cl->cwfound, cl->cwnot, cl->cwcache, cl->cwignored,
                                         cl->cwtout, cl->emmok, cl->emmnok, lrt);
 		}
 	}
-	return(sbuf);
+	return sbuf;
 }
 
 static void monitor_process_info(void) {
@@ -322,9 +313,9 @@ static void monitor_process_info(void) {
 	struct s_client *cl, *cur_cl = cur_client();
 
 	for (cl=first_client; cl ; cl=cl->next) {
-		if	((cfg.mon_hideclient_to <= 0) ||
-				( now-cl->lastecm < cfg.mon_hideclient_to) ||
-				( now-cl->lastemm < cfg.mon_hideclient_to) ||
+		if	((cfg.hideclient_to <= 0) ||
+				( now-cl->lastecm < cfg.hideclient_to) ||
+				( now-cl->lastemm < cfg.hideclient_to) ||
 				( cl->typ != 'c')){
 			if ((cur_cl->monlvl < 2) && (cl->typ != 's')) {
 					if ((cur_cl->account && cl->account && strcmp(cur_cl->account->usr, cl->account->usr)) ||
@@ -356,7 +347,7 @@ static void monitor_send_keepalive_ack(void) {
 }
 
 static void monitor_process_details_master(char *buf, uint32_t pid){
-	snprintf(buf, 256, "Version=%s#%s", CS_VERSION, CS_SVN_VERSION);
+	snprintf(buf, 256, "Version=%sr%s", CS_VERSION, CS_SVN_VERSION);
 	monitor_send_details(buf, pid);
 	snprintf(buf, 256, "System=%s", CS_TARGET);
 	monitor_send_details(buf, pid);
@@ -527,7 +518,8 @@ static void monitor_process_details(char *arg){
 static void monitor_send_login(void){
 	char buf[64];
 	struct s_client *cur_cl = cur_client();
-	if (cur_cl->auth && cur_cl->account)
+	struct monitor_data *module_data = cur_cl->module_data;
+	if (module_data->auth && cur_cl->account)
 		snprintf(buf, sizeof(buf), "[A-0000]1|%s logged in\n", cur_cl->account->usr);
 	else
 		cs_strncpy(buf, "[A-0000]0|not logged in\n", sizeof(buf));
@@ -743,7 +735,7 @@ static void monitor_set_server(char *args){
 		if (!strcmp(argarray[0], token[i]))	break;
 
 	if (i < 13){
-		chk_t_global(token[i],argarray[1]);
+		config_set("global", token[i], argarray[1]);
 		snprintf(buf, sizeof(buf), "[S-0000]setserver done - param %s set to %s\n", argarray[0], argarray[1]);
 		monitor_send_info(buf, 1);
 	} else {
@@ -755,16 +747,6 @@ static void monitor_set_server(char *args){
 	if (cfg.ftimeout>=cfg.ctimeout) {
 		cfg.ftimeout = cfg.ctimeout - 100;
 		snprintf(buf, sizeof(buf), "[S-0000]setserver WARNING: fallbacktimeout adjusted to %u ms\n", cfg.ftimeout);
-		monitor_send_info(buf, 1);
-	}
-	if(cfg.ftimeout < cfg.srtimeout) {
-		cfg.ftimeout = cfg.srtimeout + 100;
-		snprintf(buf, sizeof(buf), "[S-0000]setserver WARNING: fallbacktimeout adjusted to %u ms\n", cfg.ftimeout);
-		monitor_send_info(buf, 1);
-	}
-	if(cfg.ctimeout < cfg.srtimeout) {
-		cfg.ctimeout = cfg.srtimeout + 100;
-		snprintf(buf, sizeof(buf), "[S-0000]setserver WARNING: clienttimeout adjusted to %u ms\n", cfg.ctimeout);
 		monitor_send_info(buf, 1);
 	}
 	//kill(first_client->pid, SIGUSR1);
@@ -814,16 +796,19 @@ static int32_t monitor_process_request(char *req)
 	int32_t cmdcnt = sizeof(cmd)/sizeof(char *);  // Calculate the amount of items in array
 	char *arg;
 	struct s_client *cur_cl = cur_client();
+	struct monitor_data *module_data = cur_cl->module_data;
 
 	if( (arg = strchr(req, ' ')) ) { *arg++ = 0; trim(arg); }
 	//trim(req);
-	if ((!cur_cl->auth) && (strcmp(req, cmd[0])))	monitor_login(NULL);
+
+	if (!module_data->auth && strcmp(req, cmd[0]) != 0)
+		monitor_login(NULL);
 
 	for (rc=1, i = 0; i < cmdcnt; i++)
 		if (!strcmp(req, cmd[i])) {
 			switch(i) {
 			case  0:	monitor_login(arg); break;	// login
-			case  1:	rc=0; break;	// exit
+			case  1:	cs_disconnect_client(cur_cl); break;	// exit
 			case  2:	monitor_logsend(arg); break;	// log
 			case  3:	monitor_process_info(); break;	// status
 			case  4:	if (cur_cl->monlvl > 3) cs_exit_oscam(); break;	// shutdown
@@ -844,7 +829,7 @@ static int32_t monitor_process_request(char *req)
 			}
 			break;
 		}
-	return(rc);
+	return rc;
 }
 
 static void * monitor_server(struct s_client * client, uchar *mbuf, int32_t UNUSED(n)) {
@@ -854,20 +839,19 @@ static void * monitor_server(struct s_client * client, uchar *mbuf, int32_t UNUS
 	return NULL;
 }
 
-void module_monitor(struct s_module *ph){
-	static PTAB ptab; //since there is always only 1 monitor running, this is threadsafe
-	ptab.ports[0].s_port = cfg.mon_port;
-	ph->ptab = &ptab;
-	ph->ptab->nports = 1;
+static void monitor_cleanup(struct s_client * client) {
+	NULLFREE(client->module_data);
+}
 
-	if (cfg.mon_aulow < 1)
-		cfg.mon_aulow = 30;
+void module_monitor(struct s_module *ph){
+	ph->ptab.nports = 1;
+	ph->ptab.ports[0].s_port = cfg.mon_port;
 	ph->desc = "monitor";
 	ph->type=MOD_CONN_UDP;
-	ph->multi = 0;
-	ph->s_ip = cfg.mon_srvip;
+	IP_ASSIGN(ph->s_ip, cfg.mon_srvip);
 	ph->s_handler = monitor_server;
 	ph->recv = monitor_recv;
+	ph->cleanup = monitor_cleanup;
 	//  ph->send_dcw=NULL;
 }
 #endif

@@ -1,12 +1,15 @@
 #include "globals.h"
 #ifdef READER_VIDEOGUARD
+#include "cscrypt/md5.h"
+#include "oscam-work.h"
 #include "reader-common.h"
 #include "reader-videoguard-common.h"
 
 static void dimeno_PostProcess_Decrypt(struct s_reader * reader, unsigned char *rxbuff, unsigned char *cw)
 {
+  struct videoguard_data *csystem_data = reader->csystem_data;
   unsigned char tag,len,len2;
-  bool valid_0x55=FALSE;
+  bool valid_0x55=0;
   unsigned char *body;
   unsigned char buffer[0x10];
   int32_t a=0x13;
@@ -20,7 +23,7 @@ static void dimeno_PostProcess_Decrypt(struct s_reader * reader, unsigned char *
     {
       case 0x55:{
         if(body[0]==0x84){      //Tag 0x56 has valid data...
-          valid_0x55=TRUE;
+          valid_0x55=1;
         }
       }break;
       case 0x56:{
@@ -31,7 +34,7 @@ static void dimeno_PostProcess_Decrypt(struct s_reader * reader, unsigned char *
   }
   if(valid_0x55){
     memcpy(buffer,rxbuff+5,8);
-    AES_decrypt(buffer,buffer,&(reader->astrokey));
+    AES_decrypt(buffer,buffer,&(csystem_data->astrokey));
     memcpy(cw+0,buffer,8);      // copy calculated CW in right place
   }
 }
@@ -39,7 +42,7 @@ static void dimeno_PostProcess_Decrypt(struct s_reader * reader, unsigned char *
 static void do_post_dw_hash(struct s_reader *reader, unsigned char *cw, const unsigned char *ecm_header_data)
 {
   int32_t i, ecmi, ecm_header_count;
-  unsigned char buffer[0x80];
+  unsigned char buffer[0x85]; //original 0x80 but with 0x7D mask applied +8 bytes cw it was still to small
   unsigned char md5tmp[MD5_DIGEST_LENGTH];
   static const uint16_t Hash3[] = {0x0123,0x4567,0x89AB,0xCDEF,0xF861,0xCB52};
   static const unsigned char Hash4[] = {0x0B,0x04,0x07,0x08,0x05,0x09,0x0B,0x0A,0x07,0x02,0x0A,0x05,0x04,0x08,0x0D,0x0F};
@@ -149,14 +152,14 @@ static void do_post_dw_hash(struct s_reader *reader, unsigned char *cw, const un
       {                         //b0 01
       case 1:
         {
-          uint16_t hk[8], i, j, m = 0;
-          for (i = 0; i < 6; i++)
-            hk[2 + i] = Hash3[i];
-          for (i = 0; i < 2; i++)
+          uint16_t hk[8], r, j, m = 0;
+          for (r = 0; r < 6; r++)
+            hk[2 + r] = Hash3[r];
+          for (r = 0; r < 2; r++)
           {
             for (j = 0; j < 0x48; j += 2)
             {
-              if (i)
+              if (r)
               {
                 hk[0] = ((hk[3] & hk[5]) | ((~hk[5]) & hk[4]));
               }
@@ -183,13 +186,13 @@ static void do_post_dw_hash(struct s_reader *reader, unsigned char *cw, const un
               m = (m + 1) & 0x3F;
             }
           }
-          for (i = 0; i < 6; i++)
+          for (r = 0; r < 6; r++)
           {
-            hk[2 + i] += Hash3[i];
+            hk[2 + r] += Hash3[r];
           }
-          for (i = 0; i < 7; i++)
+          for (r = 0; r < 7; r++)
           {
-            cw[i] = hk[2 + (i >> 1)] >> ((i & 1) << 3);
+            cw[r] = hk[2 + (r >> 1)] >> ((r & 1) << 3);
           }
           cw[3] = (cw[0] + cw[1] + cw[2]) & 0xFF;
           cw[7] = (cw[4] + cw[5] + cw[6]) & 0xFF;
@@ -200,8 +203,8 @@ static void do_post_dw_hash(struct s_reader *reader, unsigned char *cw, const un
         {
           memset(buffer, 0, sizeof(buffer));
           memcpy(buffer, cw, 8);
-          memcpy(buffer + 8, &ecm_header_data[ecmi + 3], ecm_header_data[ecmi] - 2);
-          MD5(buffer, 8 + ecm_header_data[ecmi] - 2, md5tmp);
+          memcpy(buffer + 8, &ecm_header_data[ecmi + 3], ecm_header_data[ecmi]&0x7D);
+          MD5(buffer, 8 + (ecm_header_data[ecmi]&0x7D), md5tmp);
           memcpy(cw, md5tmp, 8);
           rdr_ddump_mask(reader, D_READER, cw, 8, "Postprocessed Case 3 DW:");
           break;
@@ -244,22 +247,21 @@ static void vg2_read_tiers(struct s_reader * reader)
 
   int32_t i;
   unsigned char ins76[5] = { 0xD0,0x76,0x00,0x00,0x00 };
+  struct videoguard_data *csystem_data = reader->csystem_data;
 
   // some cards start real tiers info in middle of tier info
   // and have blank tiers between old tiers and real tiers eg 09AC
-  int32_t starttier;
-  bool stopemptytier = TRUE;
-  if((starttier = reader->card_tierstart) == -1){
-    stopemptytier = FALSE;
-    starttier = 0;
-  }
+  int32_t starttier = csystem_data->card_tierstart;
+  bool stopemptytier = 1;
+  if (!starttier)
+    stopemptytier = 0;
 
   // check to see if specified start tier is blank and if blank, start at 0 and ignore blank tiers
   ins76[2]=starttier;
   l=do_cmd(reader,ins76,NULL,NULL,cta_res);
   if(l<0 || !status_ok(cta_res+l)) return;
   if(cta_res[2]==0 && cta_res[3]==0 ){
-    stopemptytier = FALSE;
+    stopemptytier = 0;
     starttier = 0;
   }
 
@@ -271,23 +273,18 @@ static void vg2_read_tiers(struct s_reader * reader)
     if(l<0 || !status_ok(cta_res+l)) return;
     if(cta_res[2]==0 && cta_res[3]==0 && stopemptytier) return;
     if(cta_res[2]!=0 || cta_res[3]!=0) {
-      int32_t y,m,d,H,M,S;
       char tiername[83];
-      rev_date_calc(&cta_res[4],&y,&m,&d,&H,&M,&S,reader->card_baseyear);
       uint16_t tier_id = (cta_res[2] << 8) | cta_res[3];
-
       // add entitlements to list
       struct tm timeinfo;
       memset(&timeinfo, 0, sizeof(struct tm));
-      timeinfo.tm_year = y - 1900; //tm year starts at 1900
-      timeinfo.tm_mon = m - 1; //tm month starts with 0
-      timeinfo.tm_mday = d;
+      rev_date_calc_tm(&cta_res[4],&timeinfo,csystem_data->card_baseyear);
       cs_add_entitlement(reader, reader->caid, b2ll(4, reader->prid[0]), tier_id, 0, 0, mktime(&timeinfo), 4);
 
       if(!stopemptytier){
         rdr_debug_mask(reader, D_READER, "tier: %04x, tier-number: 0x%02x",tier_id,i);
       }
-      rdr_log(reader, "tier: %04x, expiry date: %04d/%02d/%02d-%02d:%02d:%02d %s",tier_id,y,m,d,H,M,S,get_tiername(tier_id, reader->caid, tiername));
+      rdr_log(reader, "tier: %04x, expiry date: %04d/%02d/%02d-%02d:%02d:%02d %s",tier_id,timeinfo.tm_year+1900,timeinfo.tm_mon+1,timeinfo.tm_mday,timeinfo.tm_hour,timeinfo.tm_min,timeinfo.tm_sec,get_tiername(tier_id, reader->caid, tiername));
     }
   }
 }
@@ -304,18 +301,22 @@ static int32_t videoguard2_card_init(struct s_reader * reader, ATR *newatr)
   get_atr;
   def_resp;
 
+  if (!cs_malloc(&reader->csystem_data, sizeof(struct videoguard_data)))
+    return ERROR;
+  struct videoguard_data *csystem_data = reader->csystem_data;
+
  /* set information on the card stored in reader-videoguard-common.c */
   set_known_card_info(reader,atr,&atr_size);
 
   if((reader->ndsversion != NDS2) &&
-     (((reader->card_system_version != NDS2) && (reader->card_system_version != NDSUNKNOWN)) ||
+     (((csystem_data->card_system_version != NDS2) && (csystem_data->card_system_version != NDSUNKNOWN)) ||
       (reader->ndsversion != NDSAUTO))) {
     /* known ATR and not NDS2
        or known NDS2 ATR and forced to another NDS version */
     return ERROR;
   }
 
-  rdr_debug_mask(reader, D_READER, "type: %s, baseyear: %i", reader->card_desc, reader->card_baseyear);
+  rdr_debug_mask(reader, D_READER, "type: %s, baseyear: %i", csystem_data->card_desc, csystem_data->card_baseyear);
   if(reader->ndsversion == NDS2){
     rdr_debug_mask(reader, D_READER, "forced to NDS2");
   }
@@ -325,12 +326,9 @@ static int32_t videoguard2_card_init(struct s_reader * reader, ATR *newatr)
 
   unsigned char ins7401[5] = { 0xD0,0x74,0x01,0x00,0x00 };
   int32_t l;
-  ins7401[3]=0x80;  // from newcs log
-  ins7401[4]=0x01;
   if((l=read_cmd_len(reader,ins7401))<0){ //not a videoguard2/NDS card or communication error
    return ERROR;
   }
-  ins7401[3]=0x00;
   ins7401[4]=l;
   if(!write_cmd_vg(ins7401,NULL) || !status_ok(cta_res+l)) {
     rdr_log(reader, "classD0 ins7401: failed - cmd list not read");
@@ -347,8 +345,30 @@ static int32_t videoguard2_card_init(struct s_reader * reader, ATR *newatr)
     return ERROR;
   }
 
-  unsigned char ins36[5] = { 0xD0,0x36,0x00,0x00,0x00 };
-  static const unsigned char ins5e[5] = { 0xD0,0x5E,0x00,0x0C,0x02 };
+  static const unsigned char ins02[5] = { 0xD0,0x02,0x00,0x00,0x08 };
+  // D0 02 command is not always present in command table but should be supported
+  // on most cards so do not use do_cmd()
+  if(!write_cmd_vg(ins02,NULL) || !status_ok(cta_res+8)){
+    rdr_log(reader, "Unable to get NDS ROM version.");
+  } else {
+    int i;
+    for (i = 0; i < 8; i++) {
+      if (cta_res[i] <= 0x09) {
+        cta_res[i] = cta_res[i] + 0x30;
+      } else if (!isalnum(cta_res[i])) {
+        cta_res[i] = '*';
+      }
+    }
+    memset(reader->rom, 0, sizeof(reader->rom));
+    memcpy(reader->rom, cta_res, 4);
+    reader->rom[4] = '-';
+    memcpy(reader->rom + 5, cta_res + 4, 4);
+
+    rdr_log(reader, "Card type:   %c%c%c%c", reader->rom[0], reader->rom[1], reader->rom[2],reader->rom[3]);
+    rdr_log(reader, "Rom version: %c%c%c%c", reader->rom[5], reader->rom[6], reader->rom[7], reader->rom[8]);
+  }
+
+
   unsigned char boxID [4];
 
   if (reader->boxid > 0) {
@@ -358,9 +378,16 @@ static int32_t videoguard2_card_init(struct s_reader * reader, ATR *newatr)
         boxID[i] = (reader->boxid >> (8 * (3 - i))) % 0x100;
     }
   } else {
+    unsigned char ins36[5] = { 0xD0,0x36,0x00,0x00,0x00 };
+    static const unsigned char ins5e[5] = { 0xD0,0x5E,0x00,0x0C,0x02 };
+
     /* we can try to get the boxid from the card */
     int32_t boxidOK=0;
-    if((ins36[4]=read_cmd_len(reader,ins36))==0 && cmd_exists(reader,ins5e)) {
+    l=read_cmd_len(reader,ins36);
+    if(l > 0) {
+      ins36[4] = l;
+    }
+    else if(cmd_exists(reader,ins5e)) {
         if(!write_cmd_vg(ins5e,NULL) || !status_ok(cta_res+2)){
           rdr_log(reader, "classD0 ins5e: failed");
         } else {
@@ -402,8 +429,8 @@ static int32_t videoguard2_card_init(struct s_reader * reader, ATR *newatr)
               i+=5;
               break;
             case 0xF3: /* boxID */
-                  memcpy(boxID,buff+i+1,sizeof(boxID));
-                  boxidOK=1;
+              memcpy(boxID,buff+i+1,sizeof(boxID));
+              boxidOK=1;
               i+=5;
               break;
             case 0xF6:
@@ -516,35 +543,66 @@ static int32_t videoguard2_card_init(struct s_reader * reader, ATR *newatr)
     if(l<0 || !status_ok(cta_res)) {
       rdr_log(reader, "classD1 ins7E: failed");
       return ERROR;
-      }
+    }
   }
 
-  if (reader->ins7E11[0x01])
-  {
-    reader->ins7e11_fast_reset = 0;
-    static const uint8_t ins7E11[5] = { 0xD0,0x7E,0x11,0x00,0x01 };
-    l=do_cmd(reader,ins7E11,reader->ins7E11,NULL,cta_res);
-    if(l<0 || !status_ok(cta_res)) {
-      rdr_log(reader, "classD0 ins7E11: failed");
-      return ERROR;
-    }
-    else {
-      BYTE TA1;
-      if (ATR_GetInterfaceByte (newatr, 1, ATR_INTERFACE_BYTE_TA, &TA1) == ATR_OK) {
-        if (TA1 != reader->ins7E11[0x00]) {
-          rdr_log(reader, "classD0 ins7E11: Scheduling card reset for TA1 change from %02X to %02X", TA1, reader->ins7E11[0x00]);
-          reader->ins7e11_fast_reset = 1;
-#ifdef WITH_COOLAPI
-          if (reader->typ == R_MOUSE || reader->typ == R_SC8in1 || reader->typ == R_SMART || reader->typ == R_PCSC || reader->typ == R_INTERNAL) {
-#else
-          if (reader->typ == R_MOUSE || reader->typ == R_SC8in1 || reader->typ == R_SMART || reader->typ == R_PCSC ) {
-#endif
-            add_job(reader->client, ACTION_READER_RESET_FAST, NULL, 0);
+  if (reader->ins7E11[0x01]) {
+    unsigned char ins742b[5] = { 0xD0,0x74,0x2b,0x00,0x00 };
+  
+    l=read_cmd_len(reader,ins742b);     //get command len for ins742b
+  
+    if(l<2){
+      rdr_log(reader, "No TA1 change for this card is possible by ins7E11");
+    } else {
+      ins742b[4]=l;
+      bool ta1ok=0;
+
+      if(!write_cmd_vg(ins742b,NULL) || !status_ok(cta_res+ins742b[4])) {  //get supported TA1 bytes
+        rdr_log(reader, "classD0 ins742b: failed");
+        return ERROR;
+      } else {
+        int32_t i;
+  
+        for (i=2; i < l; i++) {
+          if (cta_res[i]==reader->ins7E11[0x00]) {
+            ta1ok=1;
+            break;
           }
-          else {
-            add_job(reader->client, ACTION_READER_RESTART, NULL, 0);
+        }
+      }
+      if(ta1ok==0) {
+        rdr_log(reader, "The value %02X of ins7E11 is not supported,try one between %02X and %02X",reader->ins7E11[0x00],cta_res[2],cta_res[ins742b[4]-1]);
+      } else {
+        static const uint8_t ins7E11[5] = { 0xD0,0x7E,0x11,0x00,0x01 };
+    
+        reader->ins7e11_fast_reset = 0;
+    
+        l=do_cmd(reader,ins7E11,reader->ins7E11,NULL,cta_res);
+    
+        if(l<0 || !status_ok(cta_res)) {
+          rdr_log(reader, "classD0 ins7E11: failed");
+          return ERROR;
+        }
+        else {
+          unsigned char TA1;
+    
+          if (ATR_GetInterfaceByte (newatr, 1, ATR_INTERFACE_BYTE_TA, &TA1) == ATR_OK) {
+            if (TA1 != reader->ins7E11[0x00]) {
+              rdr_log(reader, "classD0 ins7E11: Scheduling card reset for TA1 change from %02X to %02X", TA1, reader->ins7E11[0x00]);
+              reader->ins7e11_fast_reset = 1;
+    #ifdef WITH_COOLAPI
+              if (reader->typ == R_MOUSE || reader->typ == R_SC8in1 || reader->typ == R_SMART || reader->typ == R_INTERNAL) {
+    #else
+              if (reader->typ == R_MOUSE || reader->typ == R_SC8in1 || reader->typ == R_SMART) {
+    #endif
+                add_job(reader->client, ACTION_READER_RESET_FAST, NULL, 0);
+              }
+              else {
+                add_job(reader->client, ACTION_READER_RESTART, NULL, 0);
+              }
+              return OK; // Skip the rest of the init since the card will be reset anyway
+            }
           }
-          return OK; // Skip the rest of the init since the card will be reset anyway
         }
       }
     }
@@ -587,15 +645,15 @@ static int32_t videoguard2_card_init(struct s_reader * reader, ATR *newatr)
   int32_t a;
   for(a=0; a<4; a++)
     dimeno_magic[a]=dimeno_magic[a]^boxID[a];
-  AES_set_decrypt_key(dimeno_magic,128,&(reader->astrokey));
+  AES_set_decrypt_key(dimeno_magic,128,&(csystem_data->astrokey));
 
   rdr_log(reader, "type: %s, caid: %04X",
-         reader->card_desc,
+         csystem_data->card_desc,
          reader->caid);
   rdr_log_sensitive(reader, "serial: {%02X%02X%02X%02X}, BoxID: {%02X%02X%02X%02X}, baseyear: %i",
          reader->hexserial[2],reader->hexserial[3],reader->hexserial[4],reader->hexserial[5],
          boxID[0],boxID[1],boxID[2],boxID[3],
-         reader->card_baseyear);
+         csystem_data->card_baseyear);
   rdr_log(reader, "ready for requests");
 
   return OK;
@@ -752,8 +810,9 @@ static int32_t videoguard2_do_emm(struct s_reader * reader, EMM_PACKET *ep)
 static int32_t videoguard2_card_info(struct s_reader * reader)
 {
   /* info is displayed in init, or when processing info */
+  struct videoguard_data *csystem_data = reader->csystem_data;
   rdr_log(reader, "card detected");
-  rdr_log(reader, "type: %s", reader->card_desc);
+  rdr_log(reader, "type: %s", csystem_data->card_desc);
   if (reader->ins7e11_fast_reset != 1) {
 	  vg2_read_tiers(reader);
   }

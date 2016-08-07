@@ -1,13 +1,15 @@
-//FIXME Not checked on threadsafety yet; after checking please remove this line
 #include "globals.h"
+
 #ifdef WEBIF
-
-#include "module-webif.h"
-
-extern char *tplmap[];
-extern char *tpl[];
-extern char *JSCRIPT;
-extern char *CSS;
+#include "cscrypt/md5.h"
+#include "module-webif-lib.h"
+#include "module-webif-tpl.h"
+#include "oscam-config.h"
+#include "oscam-files.h"
+#include "oscam-lock.h"
+#include "oscam-string.h"
+#include "oscam-time.h"
+#include "oscam-net.h"
 
 extern int32_t ssl_active;
 extern pthread_key_t getkeepalive;
@@ -16,390 +18,11 @@ extern CS_MUTEX_LOCK *lock_cs;
 extern char noncekey[33];
 
 static int8_t b64decoder[256];
-
-/* Adds a name->value-mapping or appends to it. You will get a reference back which you may freely
-   use (but you should not call free/realloc on this!)*/
-char *tpl_addVar(struct templatevars *vars, uint8_t addmode, char *name, char *value){
-	if(name == NULL || value == NULL) return "";
-	int32_t i;
-	char *tmp,*result = NULL;
-	for(i = (*vars).varscnt-1; i >= 0; --i){
-		if(strcmp((*vars).names[i], name) == 0){
-			result = (*vars).values[i];
-			break;
-		}
-	}
-	if(result == NULL){
-		if((*vars).varsalloc <= (*vars).varscnt){
-			if(!cs_realloc(&(*vars).names, (*vars).varsalloc * 2 * sizeof(char**), -1)) return "";
-			if(!cs_realloc(&(*vars).values, (*vars).varsalloc * 2 * sizeof(char**), -1)) return "";
-			if(!cs_realloc(&(*vars).vartypes, (*vars).varsalloc * 2 * sizeof(uint8_t*), -1)) return "";
-			(*vars).varsalloc = (*vars).varscnt * 2;
-		}
-		int32_t len = strlen(name) + 1;
-		if(!cs_malloc(&tmp, len * sizeof(char), -1)) return "";
-		memcpy(tmp, name, len);
-		(*vars).names[(*vars).varscnt] = tmp;
-
-		len = strlen(value) + 1;
-		if(!cs_malloc(&tmp, len * sizeof(char), -1)){
-			free((*vars).names[(*vars).varscnt]);
-			return "";
-		}
-		memcpy(tmp, value, len);
-		(*vars).values[(*vars).varscnt] = tmp;
-		(*vars).vartypes[(*vars).varscnt] = addmode;
-		(*vars).varscnt++;
-	} else {
-		int32_t oldlen = 0, newlen = strlen(value);
-		if(addmode == TPLAPPEND || addmode == TPLAPPENDONCE) oldlen = strlen((*vars).values[i]);
-		if(!cs_realloc(&((*vars).values[i]), (oldlen + newlen + 1) * sizeof(char), -1)) return value;
-		memcpy((*vars).values[i] + oldlen, value, newlen + 1);
-		(*vars).vartypes[i] = addmode;
-	}
-	return tmp;
-}
-
-/* Allows to add a char array which has been allocated by malloc. It will automatically get
-  freed when calling tpl_clear(). Please do NOT free the memory yourself or realloc
-  it after having added the array here! */
-char *tpl_addTmp(struct templatevars *vars, char *value){
-	if(value == NULL) return "";
-	if((*vars).tmpalloc <= (*vars).tmpcnt){
-		if(!cs_realloc (&(*vars).tmp, (*vars).tmpalloc * 2 * sizeof(char**), -1)) return value;
-		(*vars).tmpalloc = (*vars).tmpcnt * 2;
-	}
-	(*vars).tmp[(*vars).tmpcnt] = value;
-	(*vars).tmpcnt++;
-	return value;
-}
-
-/* Allows to do a dynamic printf without knowing and defining the needed memory size. If you specify
-   varname, the printf-result will be added/appended to the varlist, if varname=NULL it will only be returned.
-   In either case you will always get a reference back which you may freely use (but you should not call
-   free/realloc on this as it will be automatically cleaned!)*/
-char *tpl_printf(struct templatevars *vars, uint8_t addmode, char *varname, char *fmtstring, ...){
-	uint32_t needed;
-	char test[1];
-	va_list argptr;
-
-	va_start(argptr,fmtstring);
-	needed = vsnprintf(test, 1, fmtstring, argptr);
-	va_end(argptr);
-
-	char *result;
-	if(!cs_malloc(&result, (needed + 1) * sizeof(char), -1)) return "";
-	va_start(argptr,fmtstring);
-	vsnprintf(result, needed + 1, fmtstring, argptr);
-	va_end(argptr);
-
-	if(varname == NULL) tpl_addTmp(vars, result);
-	else {
-		char *tmp = tpl_addVar(vars, addmode, varname, result);
-		free(result);
-		result = tmp;
-	}
-	return result;
-}
-
-/* Returns the value for a name or an empty string if nothing was found. */
-char *tpl_getVar(struct templatevars *vars, char *name){
-	int32_t i;
-	char *result = NULL;
-	for(i = (*vars).varscnt-1; i >= 0; --i){
-		if(strcmp((*vars).names[i], name) == 0){
-			result = (*vars).values[i];
-			break;
-		}
-	}
-	if(result == NULL) return "";
-	else {
-		if((*vars).vartypes[i] == TPLADDONCE || (*vars).vartypes[i] == TPLAPPENDONCE){
-			// This is a one-time-use variable which gets cleaned up automatically after retrieving it
-			if(!cs_malloc(&(*vars).values[i], 1 * sizeof(char), -1)){
-				(*vars).values[i] = result;
-				result[0] = '\0';
-				return result;
-			} else {
-				(*vars).values[i][0] = '\0';
-				return tpl_addTmp(vars, result);
-			}
-		} else return result;
-	}
-}
-
-/* Initializes all variables for a templatevar-structure and returns a pointer to it. Make
-   sure to call tpl_clear() when you are finished or you'll run into a memory leak! */
-struct templatevars *tpl_create(void) {
-	struct templatevars *vars;
-	if(!cs_malloc(&vars, sizeof(struct templatevars), -1)) return NULL;
-	(*vars).varsalloc = 64;
-	(*vars).varscnt = 0;
-	(*vars).tmpalloc = 64;
-	(*vars).tmpcnt = 0;
-	if(!cs_malloc(&(*vars).names, (*vars).varsalloc * sizeof(char**), -1)){
-		free(vars);
-		return NULL;
-	}
-	if(!cs_malloc(&(*vars).values, (*vars).varsalloc * sizeof(char**), -1)){
-		free((*vars).names);
-		free(vars);
-		return NULL;
-	};
-	if(!cs_malloc(&(*vars).vartypes, (*vars).varsalloc * sizeof(uint8_t*), -1)){
-		free((*vars).names);
-		free((*vars).values);
-		free(vars);
-		return NULL;
-	};
-	if(!cs_malloc(&(*vars).tmp, (*vars).tmpalloc * sizeof(char**), -1)){
-		free((*vars).names);
-		free((*vars).values);
-		free((*vars).vartypes);
-		free(vars);
-		return NULL;
-	};
-	return vars;
-}
-
-/* Clears all allocated memory for the specified templatevar-structure. */
-void tpl_clear(struct templatevars *vars){
-	int32_t i;
-	for(i = (*vars).varscnt-1; i >= 0; --i){
-		free((*vars).names[i]);
-		free((*vars).values[i]);
-	}
-	free((*vars).names);
-	free((*vars).values);
-	free((*vars).vartypes);
-	for(i = (*vars).tmpcnt-1; i >= 0; --i){
-		free((*vars).tmp[i]);
-	}
-	free((*vars).tmp);
-	free(vars);
-}
-
-/* Creates a path to a template file. You need to set the resultsize to the correct size of result. */
-char *tpl_getFilePathInSubdir(const char *path, const char* subdir, const char *name, const char* ext, char *result, uint32_t resultsize){
-	if(strlen(path) + strlen(name) + strlen(subdir) + strlen(ext) < resultsize){
-		snprintf(result, resultsize, "%s%s%s%s", path, subdir, name, ext);
-	} else result[0] = '\0';
-
-	return result;
-}
-
-char *tpl_getTplPath(const char *name, const char *path, char *result, uint32_t resultsize){
-	return tpl_getFilePathInSubdir(path, "", name, ".tpl", result,  resultsize);
-}
-
-/* Returns an unparsed template either from disk or from internal templates.
-   Note: You must free() the result after using it and you may get NULL if an error occured!*/
-static char *tpl_getUnparsedTpl(const char* name, int8_t removeHeader, const char* subdir){
-  int32_t i;
-  int32_t tplcnt = tpl_count();
-  int32_t tplmapcnt = tplmap_count();
-  char *result;
-
-  for(i = 0; i < tplcnt; ++i){
-  	if(strcmp(name, tpl[i]) == 0) break;
-  }
-
-  if(strlen(cfg.http_tpl) > 0){
-  	char path[255];
-  	if ( (strlen(tpl_getFilePathInSubdir(cfg.http_tpl, subdir, name, ".tpl", path, 255)) > 0 && file_exists(path))
-      || (strlen(subdir) > 0
-       && strlen(tpl_getFilePathInSubdir(cfg.http_tpl, ""    , name, ".tpl", path, 255)) > 0 && file_exists(path))) {
-			FILE *fp;
-			char buffer[1024];
-			int32_t read, allocated = 1025, offset, size = 0;
-			if(!cs_malloc(&result, allocated * sizeof(char), -1)) return NULL;
-			if((fp = fopen(path,"r"))!=NULL){
-			while((read = fread(&buffer,sizeof(char),1024,fp)) > 0){
-				offset = 0;
-				if(size == 0 && removeHeader){
-					char *pch = strstr(buffer,"<!--OSCam");
-					if(pch != NULL){
-						pch = strstr(buffer,"-->");
-						if(pch != NULL){
-							offset = pch - buffer + 4;
-							read -= offset;
-						}
-					}
-				}
-				if(allocated < size + read + 1) {
-					allocated += size + 1024;
-					if(!cs_realloc(&result, allocated * sizeof(char), -1)) return NULL;
-				}
-				memcpy(result + size, buffer + offset, read);
-				size += read;
-			}
-			result[size] = '\0';
-			fclose (fp);
-			return result;
-			}
-	  }
-  }
- 	if(i >= 0 && i < tplmapcnt){
- 		int32_t len = (strlen(tplmap[i])) + 1;
- 		if(!cs_malloc(&result, len * sizeof(char), -1)) return NULL;
- 		memcpy(result, tplmap[i], len);
- 	} else {
- 		if(!cs_malloc(&result, 1 * sizeof(char), -1)) return NULL;
- 		result[0] = '\0';
-  }
- 	return result;
-}
-
-/* Returns the specified template with all variables/other templates replaced or an
-   empty string if the template doesn't exist. Do not free the result yourself, it
-   will get automatically cleaned up! */
-char *tpl_getTpl(struct templatevars *vars, const char* name){
-
-	char *tplorg = tpl_getUnparsedTpl(name, 1, tpl_getVar(vars, "SUBDIR"));
-	if(!tplorg) return "";
-	char *tplend = tplorg + strlen(tplorg);
-	char *pch, *pch2, *tpl=tplorg;
-	char varname[33];
-
-	int32_t tmp,respos = 0;
-	int32_t allocated = 2 * strlen(tpl) + 1;
-	char *result;
-	if(!cs_malloc(&result, allocated * sizeof(char), -1)) return "";
-
-	while(tpl < tplend){
-		if(tpl[0] == '#' && tpl[1] == '#' && tpl[2] != '#'){
-			pch2 = tpl;
-			pch = tpl + 2;
-			while(pch[0] != '\0' && (pch[0] != '#' || pch[1] != '#')) ++pch;
-			if(pch - pch2 < 32 && pch[0] == '#' && pch[1] == '#'){
-				memcpy(varname, pch2 + 2, pch - pch2 - 2);
-				varname[pch - pch2 - 2] = '\0';
-				if(strncmp(varname, "TPL", 3) == 0){
-					pch2 = tpl_getTpl(vars, varname + 3);
-				} else {
-					pch2 = tpl_getVar(vars, varname);
-				}
-				tmp = strlen(pch2);
-				if(tmp + respos + 2 >= allocated){
-					allocated = tmp + respos + 256;
-					if(!cs_realloc(&result, allocated * sizeof(char), -1)) return "";
-				}
-				memcpy(result + respos, pch2, tmp);
-				respos += tmp;
-				tpl = pch + 2;
-			}
-		} else {
-			if(respos + 2 >= allocated){
-				allocated = respos + 256;
-				if(!cs_realloc(&result, allocated * sizeof(char), -1)) return "";
-			}
-			result[respos] = tpl[0];
-			++respos;
-			++tpl;
-		}
-	}
-	free(tplorg);
-	result[respos] = '\0';
-	tpl_addTmp(vars, result);
-	return result;
-}
-
-/* Saves all templates to the specified paths. Existing files will be overwritten! */
-int32_t tpl_saveIncludedTpls(const char *path){
-  int32_t tplcnt = tpl_count();
-  int32_t tplmapcnt = tplmap_count();
-  int32_t i, cnt = 0;
-  char tmp[256];
-  FILE *fp;
-  for(i = 0; i < tplcnt && i < tplmapcnt; ++i){
-  	if(strlen(tpl_getTplPath(tpl[i], path, tmp, 256)) > 0 && (fp = fopen(tmp,"w")) != NULL){
-  		int32_t len = strlen(tplmap[i]);
-  		if(!(tpl[i][0] == 'I' && tpl[i][1] == 'C')){
-  			fprintf(fp, "<!--OSCam;%lu;%s;%s-->\n", crc32(0L, (unsigned char*)tplmap[i], len), CS_VERSION, CS_SVN_VERSION);
-  		}
-			fwrite(tplmap[i], sizeof(char), len, fp);
-			fclose (fp);
-			++cnt;
-		}
-	}
-	return cnt;
-}
-
-/* Checks all disk templates in a directory if they are still current or may need upgrade! */
-void tpl_checkOneDirDiskRevisions(const char* subdir) {
-	char dirpath[255] = "\0";
-	snprintf(dirpath, 255, "%s%s", cfg.http_tpl, subdir);
-
-	int32_t i, tplcnt = tpl_count();
-		char path[255];
-		for(i = 0; i < tplcnt; ++i){
-			if(tpl[i][0] != 'I' && tpl[i][1] != 'C' && strlen(tpl_getTplPath(tpl[i], dirpath, path, 255)) > 0 && file_exists(path)){
-				int8_t error = 1;
-				char *tplorg = tpl_getUnparsedTpl(tpl[i], 0, subdir);
-				unsigned long curchecksum = crc32(0L, (unsigned char*)tplmap[i], strlen(tplmap[i]));
-				char *pch = strstr(tplorg, "<!--OSCam;");
-				if(pch != NULL){
-					pch = pch + 10;
-					unsigned long checksum = strtoul(pch, NULL, 10);
-					if(checksum != curchecksum){
-						pch = strchr(pch, ';');
-						char *version = "", *revision = "";
-						if(pch != NULL){
-							version = pch + 1;
-							pch = strchr(version, ';');
-							if(pch != NULL){
-								pch[0] = '\0';
-								revision = pch + 1;
-								pch = strstr(revision, "-->");
-								if(pch != NULL) pch[0] = '\0';
-							}
-						}
-						cs_log("WARNING: Your http disk template %s was created for an older revision of OSCam and was changed in original OSCam (%s,r%s). Please consider upgrading it!", path, version, revision);
-					} else error = 0;
-				} else cs_log("WARNING: Your http disk template %s is in the old template format without revision info. Please consider upgrading it!", path);
-				if(error) cs_log("If you are sure that it is current, add the following line at the beginning of the template to suppress this warning: <!--OSCam;%lu;%s;%s-->", curchecksum, CS_VERSION, CS_SVN_VERSION);
-				free(tplorg);
-			}
-		}
-}
-
-/* Checks whether disk templates need upgrade - including sub-directories */
-void tpl_checkDiskRevisions(void) {
-	char subdir[255];
-	char dirpath[255];
-	if(strlen(cfg.http_tpl) > 0) {
-		tpl_checkOneDirDiskRevisions("");
-
-		DIR *hdir;
-		struct dirent entry;
-		struct dirent *result;
-		struct stat s;
-		if((hdir = opendir(cfg.http_tpl)) != NULL) {
-			while(cs_readdir_r(hdir, &entry, &result) == 0 && result != NULL) {
-				if (strcmp(".", entry.d_name) == 0 || strcmp("..", entry.d_name) == 0) {
-					continue;
-				}
-				snprintf(dirpath, 255, "%s%s", cfg.http_tpl, entry.d_name);
-				if (stat(dirpath, &s) == 0) {
-					if (s.st_mode & S_IFDIR) {
-						snprintf(subdir, 255,
-						#ifdef WIN32
-									"%s\\"
-						#else
-									"%s/"
-						#endif
-								, entry.d_name);
-						tpl_checkOneDirDiskRevisions(subdir);
-					}
-				}
-			}
-			closedir(hdir);
-		}
-	}
-}
+static struct s_nonce *nonce_first[AUTHNONCEHASHBUCKETS];
+static CS_MUTEX_LOCK nonce_lock[AUTHNONCEHASHBUCKETS];
 
 /* Parses a value in an authentication string by removing all quotes/whitespace. Note that the original array is modified. */
-char *parse_auth_value(char *value){
+static char *parse_auth_value(char *value){
 	char *pch = value;
 	char *pch2;
 	value = strstr(value, "=");
@@ -473,19 +96,87 @@ time_t parse_modifiedsince(char * value){
 	return modifiedheader;
 }
 
-/* Calculates the currently valid nonce value and copies it to result. Please note that result needs to be at least (MD5_DIGEST_LENGTH * 2) + 1 large. */
-void calculate_nonce(char *result){
-  char noncetmp[128];
-  unsigned char md5tmp[MD5_DIGEST_LENGTH];
-  snprintf(noncetmp, sizeof(noncetmp), "%d:%s", (int)time(NULL)/AUTHNONCEVALIDSECS, noncekey);
-  char_to_hex(MD5((unsigned char*)noncetmp, strlen(noncetmp), md5tmp), MD5_DIGEST_LENGTH, (unsigned char*)result);
+/* Calculates a new opaque value. Please note that opaque needs to be at least (MD5_DIGEST_LENGTH * 2) + 1 large. */
+void calculate_opaque(IN_ADDR_T addr, char *opaque){
+	char noncetmp[128];
+	unsigned char md5tmp[MD5_DIGEST_LENGTH];
+  snprintf(noncetmp, sizeof(noncetmp), "%d:%s:%d", (int32_t)time((time_t)0), cs_inet_ntoa(addr), (int16_t)rand());
+  char_to_hex(MD5((unsigned char*)noncetmp, strlen(noncetmp), md5tmp), MD5_DIGEST_LENGTH, (unsigned char*)opaque);
+}
+
+void init_noncelocks(void){
+	int32_t i;
+	for(i = 0; i < AUTHNONCEHASHBUCKETS; ++i){
+		cs_lock_create(&nonce_lock[i], 5, "nonce_lock");
+		nonce_first[i] = NULL;
+	}
+}
+
+/* Calculates the currently valid nonce value and copies it to result. Please note that nonce (may be NULL), opaque and result needs to be at least (MD5_DIGEST_LENGTH * 2) + 1 large. */
+void calculate_nonce(char *nonce, char *result, char *opaque){
+	struct s_nonce *noncelist, *prev, *foundnonce = NULL, *foundopaque = NULL, *foundexpired = NULL;
+	int32_t bucket = opaque[0] % AUTHNONCEHASHBUCKETS;
+	time_t now = time((time_t)0);
+	cs_writelock(&nonce_lock[bucket]);
+	for(noncelist = nonce_first[bucket], prev = NULL; noncelist; prev = noncelist, noncelist = noncelist->next){
+		if(now > noncelist->expirationdate){
+			if(prev) prev->next = NULL;
+			else {
+				nonce_first[bucket] = NULL;
+			}
+			foundexpired = noncelist;
+			break;
+		}
+		if(nonce && !memcmp(noncelist->nonce, nonce, (MD5_DIGEST_LENGTH * 2) + 1)) {
+			memcpy(result, noncelist->nonce, (MD5_DIGEST_LENGTH * 2) + 1);
+			foundnonce = noncelist;
+			if(!noncelist->firstuse) noncelist->firstuse = now;
+			else if(now - foundnonce->firstuse > AUTHNONCEVALIDSECS){
+				if(prev) prev->next = noncelist->next;
+				else {
+					nonce_first[bucket] = noncelist->next;
+				}			
+			}
+			break;
+		} else if (!noncelist->firstuse && !memcmp(noncelist->opaque, opaque, (MD5_DIGEST_LENGTH * 2) + 1)){
+			foundopaque = noncelist;
+		}
+	}
+	if(foundnonce && now - foundnonce->firstuse > AUTHNONCEVALIDSECS){
+		free(foundnonce);
+		foundnonce = NULL;
+	}
+	if(!foundnonce && foundopaque)
+		memcpy(result, foundopaque->nonce, (MD5_DIGEST_LENGTH * 2) + 1);
+	if(!foundnonce && !foundopaque){
+		char noncetmp[128], randstr[16];
+	  unsigned char md5tmp[MD5_DIGEST_LENGTH];
+	  get_random_bytes((uint8_t*)randstr, sizeof(randstr)-1);
+	  randstr[sizeof(randstr)-1] = '\0';
+	  snprintf(noncetmp, sizeof(noncetmp), "%d:%s:%s", (int32_t)now, randstr, noncekey);
+	  char_to_hex(MD5((unsigned char*)noncetmp, strlen(noncetmp), md5tmp), MD5_DIGEST_LENGTH, (unsigned char*)result);
+	  if(cs_malloc(&noncelist, sizeof(struct s_nonce))){
+	  	noncelist->expirationdate = now + AUTHNONCEEXPIRATION;
+	  	memcpy(noncelist->nonce, result, (MD5_DIGEST_LENGTH * 2) + 1);
+	  	memcpy(noncelist->opaque, opaque, (MD5_DIGEST_LENGTH * 2) + 1);
+	  	noncelist->next = nonce_first[bucket];
+	  	nonce_first[bucket] = noncelist;	  	
+	  }
+	}
+	cs_writeunlock(&nonce_lock[bucket]);
+	while(foundexpired){
+		prev = foundexpired;
+		foundexpired = foundexpired->next;
+		free(prev);
+	}
 }
 
 /* Checks if authentication is correct. Returns -1 if not correct, 1 if correct and 2 if nonce isn't valid anymore.
    Note that authstring will be modified. */
-int32_t check_auth(char *authstring, char *method, char *path, char *expectednonce){
+int32_t check_auth(char *authstring, char *method, char *path, IN_ADDR_T addr, char *expectednonce, char *opaque){
 	int32_t authok = 0, uriok = 0;
-	char *authnonce = "";
+	char authnonce[(MD5_DIGEST_LENGTH * 2) + 1];
+	memset(authnonce, 0, sizeof(authnonce));
 	char *authnc = "";
 	char *authcnonce = "";
 	char *authresponse = "";
@@ -495,12 +186,13 @@ int32_t check_auth(char *authstring, char *method, char *path, char *expectednon
 	char *pch = authstring + 22;
 	char *pch2;
 	char *saveptr1=NULL;
+	memset(opaque, 0, (MD5_DIGEST_LENGTH * 2) + 1);
 
 	for(pch = strtok_r (pch, ",", &saveptr1); pch; pch = strtok_r (NULL, ",", &saveptr1)){
 		pch2 = pch;
 	  while(pch2[0] == ' ' && pch2[0] != '\0') ++pch2;
 	  if(strncmp(pch2, "nonce", 5) == 0){
-	  	authnonce=parse_auth_value(pch2);
+	  	cs_strncpy(authnonce, parse_auth_value(pch2), sizeof(authnonce));
 	  } else if (strncmp(pch2, "nc", 2) == 0){
 	  	authnc=parse_auth_value(pch2);
 	  } else if (strncmp(pch2, "cnonce", 6) == 0){
@@ -511,6 +203,9 @@ int32_t check_auth(char *authstring, char *method, char *path, char *expectednon
 	  	uri=parse_auth_value(pch2);
 	  } else if (strncmp(pch2, "username", 8) == 0){
 	  	username=parse_auth_value(pch2);
+	  } else if (strncmp(pch2, "opaque", 6) == 0){
+	  	char *tmp=parse_auth_value(pch2);
+	  	cs_strncpy(opaque, tmp, (MD5_DIGEST_LENGTH * 2) + 1);
 	  }
 	}
 
@@ -519,10 +214,10 @@ int32_t check_auth(char *authstring, char *method, char *path, char *expectednon
 		pch2 = uri;
 		for(pch = uri; pch[0] != '\0'; ++pch) {
 			if(pch[0] == '/') pch2 = pch;
+			if(strncmp(pch2, path, strlen(path)) == 0) uriok = 1;
 		}
-		if(strncmp(pch2, path, strlen(path)) == 0) uriok = 1;
 	}
-	if(uriok == 1 && strcmp(username, cfg.http_user) == 0){
+	if (uriok == 1 && streq(username, cfg.http_user)) {
 		char A1tmp[3 + strlen(username) + strlen(AUTHREALM) + strlen(expectedPassword)];
 		char A1[(MD5_DIGEST_LENGTH * 2) + 1], A2[(MD5_DIGEST_LENGTH * 2) + 1], A3[(MD5_DIGEST_LENGTH * 2) + 1];
 		unsigned char md5tmp[MD5_DIGEST_LENGTH];
@@ -538,8 +233,13 @@ int32_t check_auth(char *authstring, char *method, char *path, char *expectednon
 		char_to_hex(MD5((unsigned char*)A3tmp, strlen(A3tmp), md5tmp), MD5_DIGEST_LENGTH, (unsigned char*)A3);
 
 		if(strcmp(A3, authresponse) == 0) {
+			if(strlen(opaque) != MD5_DIGEST_LENGTH*2) calculate_opaque(addr, opaque);
+			calculate_nonce(authnonce, expectednonce, opaque);
 			if(strcmp(expectednonce, authnonce) == 0) authok = 1;
-			else authok = 2;
+			else {
+				authok = 2;
+				cs_debug_mask(D_TRACE, "WebIf: Received stale header from %s (nonce=%s, expectednonce=%s, opaque=%s).", cs_inet_ntoa(addr), authnonce, expectednonce, opaque);
+			}
 		}
 	}
 	return authok;
@@ -629,63 +329,69 @@ void send_error500(FILE *f){
 	send_error(f, 500, "Internal Server Error", NULL, "The server encountered an internal error that prevented it from fulfilling this request.", 0);
 }
 
-void send_header304(FILE *f){
-	send_headers(f, 304, "Not Modified", NULL, NULL, 1, 0, NULL, 0);
+void send_header304(FILE *f, char *extraheader){
+	send_headers(f, 304, "Not Modified", extraheader, NULL, 1, 0, NULL, 0);
 }
 
 /*
  * function for sending files.
  */
-void send_file(FILE *f, char *filename, char* subdir, time_t modifiedheader, uint32_t etagheader){
-	int8_t fileno = 0;
+void send_file(FILE *f, char *filename, char* subdir, time_t modifiedheader, uint32_t etagheader, char *extraheader){
+	int8_t filen = 0;
 	int32_t size = 0;
 	char* mimetype = "", *result = " ", *allocated = NULL;
 	time_t moddate;
   	char path[255];
+	char* CSS = NULL;
+	char* JSCRIPT = NULL;
+	char* TOUCH_CSS = NULL;
+	char* TOUCH_JSCRIPT = NULL;
 
 	if (!strcmp(filename, "CSS")){
-		filename = cfg.http_css;
+		filename = cfg.http_css ? cfg.http_css : "";
 		if (subdir && strlen(subdir) > 0) {
-			filename = tpl_getFilePathInSubdir(cfg.http_tpl, subdir, "site", ".css", path, 255);
+			filename = tpl_getFilePathInSubdir(cfg.http_tpl ? cfg.http_tpl : "", subdir, "site", ".css", path, 255);
 		}
 		mimetype = "text/css";
-		fileno = 1;
+		filen = 1;
 	} else if (!strcmp(filename, "JS")){
-		filename = cfg.http_jscript;
+		filename = cfg.http_jscript ? cfg.http_jscript : "";
 		if (subdir && strlen(subdir) > 0) {
-			filename = tpl_getFilePathInSubdir(cfg.http_tpl, subdir, "oscam", ".js", path, 255);
+			filename = tpl_getFilePathInSubdir(cfg.http_tpl ? cfg.http_tpl : "", subdir, "oscam", ".js", path, 255);
 		}
 		mimetype = "text/javascript";
-		fileno = 2;
+		filen = 2;
 	}
 
-	if(strlen(filename) > 0 && file_exists(filename) == 1){
+	if (strlen(filename) > 0 && file_exists(filename)) {
 		struct stat st;
 		stat(filename, &st);
 		moddate = st.st_mtime;
 		// We need at least size 1 or keepalive gets problems on some browsers...
 		if(st.st_size > 0){
 			FILE *fp;
-			int32_t read;
+			int32_t readen;
 			if((fp = fopen(filename, "r"))==NULL) return;
-			if(!cs_malloc(&allocated, st.st_size + 1, -1)){
+			if (!cs_malloc(&allocated, st.st_size + 1)) {
 				send_error500(f);
 				fclose(fp);
 				return;
 			}
-			if((read = fread(allocated, 1, st.st_size, fp)) == st.st_size){
-			  allocated[read] = '\0';
+			if((readen = fread(allocated, 1, st.st_size, fp)) == st.st_size){
+			  allocated[readen] = '\0';
 			}
 			fclose(fp);
 		}
 
-		if (fileno == 1 && cfg.http_prepend_embedded_css) { // Prepend Embedded CSS
+		if (filen == 1 && cfg.http_prepend_embedded_css) { // Prepend Embedded CSS
 			char* separator = "/* External CSS */";
 			char* oldallocated = allocated;
+			CSS = tpl_getUnparsedTpl("CSS", 1, "");
 			int32_t newsize = strlen(CSS) + strlen(separator) + 2;
 			if (oldallocated) newsize += strlen(oldallocated) + 1;
-			if(!cs_malloc(&allocated, newsize, -1)){
+			if (!cs_malloc(&allocated, newsize)) {
 				if (oldallocated) free(oldallocated);
+				free(CSS);
 				send_error500(f);
 				return;
 			}
@@ -697,109 +403,38 @@ void send_file(FILE *f, char *filename, char* subdir, time_t modifiedheader, uin
 		if (allocated) result = allocated;
 
 	} else {
-		moddate = first_client->login;
-		if (fileno == 1 && strlen(CSS) > 0){
+		CSS = tpl_getUnparsedTpl("CSS", 1, "");
+		JSCRIPT = tpl_getUnparsedTpl("JSCRIPT", 1, "");
+#ifdef TOUCH
+		TOUCH_CSS = tpl_getUnparsedTpl("TOUCH_CSS", 1, "");
+		TOUCH_JSCRIPT = tpl_getUnparsedTpl("TOUCH_JSCRIPT", 1, "");
+		char* res_tpl = !subdir || strcmp(subdir, TOUCH_SUBDIR)
+			? (filen == 1 ? CSS : JSCRIPT)
+			: (filen == 1 ? TOUCH_CSS : TOUCH_JSCRIPT);
+		if (strlen(res_tpl) > 0) result = res_tpl;
+#else
+		if (filen == 1 && strlen(CSS) > 0){
 			result = CSS;
-		} else if (fileno == 2 && strlen(JSCRIPT) > 0){
+		} else if (filen == 2 && strlen(JSCRIPT) > 0){
 			result = JSCRIPT;
 		}
+#endif
+		moddate = first_client->login;
 	}
 
 	size = strlen(result);
 
 	if((etagheader == 0 && moddate < modifiedheader) || (etagheader > 0 && (uint32_t)crc32(0L, (uchar *)result, size) == etagheader)){
-		send_header304(f);
+		send_header304(f, extraheader);
 	} else {
 		send_headers(f, 200, "OK", NULL, mimetype, 1, size, result, 0);
 		webif_write(result, f);
 	}
 	if (allocated) free(allocated);
-}
-
-/* Helper function for urldecode.*/
-static int32_t x2i(int32_t i){
-	i=toupper(i);
-	i = i - '0';
-	if(i > 9) i = i - 'A' + '9' + 1;
-	return i;
-}
-
-/* Decodes values in a http url. Note: The original value is modified! */
-void urldecode(char *s){
-	int32_t c, c1, n;
-	char *t;
-	t = s;
-	n = strlen(s);
-	while(n >0){
-		c = *s++;
-		if(c == '+') c = ' ';
-		else if(c == '%' && n > 2){
-			c = *s++;
-			c1 = c;
-			c = *s++;
-			c = 16*x2i(c1) + x2i(c);
-			n -= 2;
-		}
-		*t++ = c;
-		n--;
-	}
-	*t = 0;
-}
-
-/* Encode values in a http url. Do not call free() or realloc on the returned reference or you will get memory corruption! */
-char *urlencode(struct templatevars *vars, char *str){
-	char buf[strlen(str) * 3 + 1];
-	char *pstr = str, *pbuf = buf;
-	while (*pstr) {
-		if (isalnum(*pstr) || *pstr == '-' || *pstr == '_' || *pstr == '.' || *pstr == '~') *pbuf++ = *pstr;
-		else if (*pstr == ' ') *pbuf++ = '+';
-		else {
-			*pbuf++ = '%';
-			*pbuf++ = to_hex(*pstr >> 4);
-			*pbuf++ = to_hex(*pstr & 15);
-		}
-		++pstr;
-	}
-	*pbuf = '\0';
-	/* Allocate the needed memory size and store it in the templatevars */
-	if(!cs_malloc(&pbuf, strlen(buf) + 1, -1)) return "";
-	memcpy(pbuf, buf, strlen(buf) + 1);
-	return tpl_addTmp(vars, pbuf);
-}
-
-/* XML-Escapes a char array. The returned reference will be automatically cleaned through the templatevars-mechanism tpl_clear().
-   Do not call free() or realloc on the returned reference or you will get memory corruption! */
-char *xml_encode(struct templatevars *vars, char *chartoencode) {
-	int32_t i, pos = 0, len = strlen(chartoencode);
-	char *result;
-	/* In worst case, every character could get converted to 6 chars (we only support ASCII, for Unicode it would be 7)*/
-	char encoded[len * 6 + 1], buffer[7];
-	for (i = 0; i < len; ++i){
-		switch(chartoencode[i]) {
-			case '&': memcpy(encoded + pos, "&amp;", 5); pos+=5; break;
-			case '<': memcpy(encoded + pos, "&lt;", 4); pos+=4; break;
-			case '>': memcpy(encoded + pos, "&gt;", 4); pos+=4; break;
-			case '"': memcpy(encoded + pos, "&quot;", 6); pos+=6; break;
-			case '\'': memcpy(encoded + pos, "&apos;", 6); pos+=6; break;
-
-			default:
-				if ( (unsigned int)chartoencode[i] < 32 || (cs_http_use_utf8 != 1 && (unsigned int)chartoencode[i] > 127)) {
-					snprintf(buffer, 7, "&#%d;", chartoencode[i] + 256);
-					memcpy(encoded + pos, buffer, strlen(buffer));
-					pos+=strlen(buffer);
-
-				} else {
-					encoded[pos] = chartoencode[i];
-					++pos;
-				}
-
-		}
-	}
-	/* Allocate the needed memory size and store it in the templatevars */
-	if(!cs_malloc(&result, pos + 1, -1)) return "";
-	memcpy(result, encoded, pos);
-	result[pos] = '\0';
-	return tpl_addTmp(vars, result);
+	free(CSS);
+	free(JSCRIPT);
+	free(TOUCH_CSS);
+	free(TOUCH_JSCRIPT);
 }
 
 /* Prepares the base64 decoding array */
@@ -859,37 +494,6 @@ int32_t b64decode(unsigned char *result){
 	return j;
 }
 
-/* Format a seconds integer to hh:mm:ss or dd hh:mm:ss depending hrs >24 */
-char *sec2timeformat(struct templatevars *vars, int32_t seconds) {
-
-	char *value;
-	if(seconds <= 0)
-		return "00:00:00";
-
-	if(!cs_malloc(&value, 16 * sizeof(char), -1))
-		return "00:00:00";
-
-	int32_t secs = 0, fullmins = 0, mins = 0, fullhours = 0, hours = 0,	days = 0;
-
-	secs = seconds % 60;
-	if (seconds >= 60) {
-		fullmins = seconds / 60;
-		mins = fullmins % 60;
-		if(fullmins >= 60) {
-			fullhours = fullmins / 60;
-			hours = fullhours % 24;
-			days = fullhours / 24;
-		}
-	}
-
-	if(days == 0)
-		snprintf(value, 16, "%02d:%02d:%02d", hours, mins, secs);
-	else
-		snprintf(value, 16, "%02dd %02d:%02d:%02d", days, hours, mins, secs);
-
-	return tpl_addTmp(vars, value);
-}
-
 /* Parse url parameters and save them to params array. The pch pointer is increased to the position where parsing stopped. */
 void parseParams(struct uriparams *params, char *pch) {
 	char *pch2;
@@ -942,11 +546,11 @@ struct CRYPTO_dynlock_value{
 };
 
 /* function really needs unsigned long to prevent compiler warnings... */
-unsigned long SSL_id_function(void){
+static unsigned long SSL_id_function(void){
 	return ((unsigned long) pthread_self());
 }
 
-void SSL_locking_function(int32_t mode, int32_t type, const char *file, int32_t line){
+static void SSL_locking_function(int32_t mode, int32_t type, const char *file, int32_t line) {
 	if (mode & CRYPTO_LOCK) {
 		cs_writelock(&lock_cs[type]);
 	} else {
@@ -956,9 +560,11 @@ void SSL_locking_function(int32_t mode, int32_t type, const char *file, int32_t 
 	if(file || line) return;
 }
 
-struct CRYPTO_dynlock_value *SSL_dyn_create_function(const char *file, int32_t line){
+static struct CRYPTO_dynlock_value *SSL_dyn_create_function(const char *file, int32_t line) {
     struct CRYPTO_dynlock_value *l;
-    if(!cs_malloc(&l, sizeof(struct CRYPTO_dynlock_value), -1)) return (NULL);
+	if (!cs_malloc(&l, sizeof(struct CRYPTO_dynlock_value)))
+		return NULL;
+
 		if(pthread_mutex_init(&l->mutex, NULL)) {
 			// Initialization of mutex failed.
 			free(l);
@@ -970,7 +576,7 @@ struct CRYPTO_dynlock_value *SSL_dyn_create_function(const char *file, int32_t l
     return l;
 }
 
-void SSL_dyn_lock_function(int32_t mode, struct CRYPTO_dynlock_value *l, const char *file, int32_t line){
+static void SSL_dyn_lock_function(int32_t mode, struct CRYPTO_dynlock_value *l, const char *file, int32_t line) {
 	if (mode & CRYPTO_LOCK) {
 		pthread_mutex_lock(&l->mutex);
 	} else {
@@ -980,7 +586,7 @@ void SSL_dyn_lock_function(int32_t mode, struct CRYPTO_dynlock_value *l, const c
 	if(file || line) return;
 }
 
-void SSL_dyn_destroy_function(struct CRYPTO_dynlock_value *l, const char *file, int32_t line){
+static void SSL_dyn_destroy_function(struct CRYPTO_dynlock_value *l, const char *file, int32_t line) {
 	pthread_mutex_destroy(&l->mutex);
 	free(l);
 	// just to remove compiler warnings...
@@ -1031,8 +637,8 @@ SSL_CTX *SSL_Webif_Init(void) {
 
 	char path[128];
 
-	if (cfg.http_cert[0]==0)
-		snprintf(path, sizeof(path), "%s%s", cs_confdir, cs_cert);
+	if (!cfg.http_cert)
+		get_config_filename(path, sizeof(path), cs_cert);
 	else
 		cs_strncpy(path, cfg.http_cert, sizeof(path));
 

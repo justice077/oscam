@@ -1,7 +1,10 @@
 #include "globals.h"
 #ifdef READER_SECA
 #include "reader-common.h"
-#include <stdlib.h>
+
+struct seca_data {
+	bool valid_provider[CS_MAXPROV];
+};
 
 static uint64_t get_pbm(struct s_reader * reader, uint8_t idx)
 {
@@ -35,7 +38,7 @@ static int32_t set_provider_info(struct s_reader * reader, int32_t i)
   int32_t year, month, day;
   struct tm lt;
   time_t t;
-  int32_t valid=0;//0=false, 1=true
+  bool valid = false;
   char l_name[16+8+1]=", name: ";
   char tmp[9];
 
@@ -69,12 +72,13 @@ static int32_t set_provider_info(struct s_reader * reader, int32_t i)
   l_name[0]=(l_name[8]) ? ',' : 0;
   if (l_name[8])
 	  add_provider(0x0100, provid, l_name + 8, "", "");
-  reader->availkeys[i][0]=valid; //misusing availkeys to register validity of provider
+  struct seca_data *csystem_data = reader->csystem_data;
+  csystem_data->valid_provider[i] = valid;
   rdr_log (reader, "provider %d: %04X, valid: %i%s, expiry date: %4d/%02d/%02d",
          i+1, provid, valid, l_name, year, month, day);
   memcpy(&reader->sa[i][0], cta_res+18, 4);
-  if (valid==1) //if not expired
-    rdr_log (reader, "SA: %s", cs_hexdump(0, cta_res+18, 4, tmp, sizeof(tmp)));
+  if (valid) //if not expired
+    rdr_log_sensitive(reader, "SA: {%s}", cs_hexdump(0, cta_res+18, 4, tmp, sizeof(tmp)));
 
   // add entitlement to list
   memset(&lt, 0, sizeof(struct tm));
@@ -156,6 +160,10 @@ static int32_t seca_card_init(struct s_reader * reader, ATR *newatr)
 
   buf[0]=0x00;
   if ((atr[10]!=0x0e) || (atr[11]!=0x6c) || (atr[12]!=0xb6) || (atr[13]!=0xd6)) return ERROR;
+
+  if (!cs_malloc(&reader->csystem_data, sizeof(struct seca_data)))
+     return ERROR;
+
   switch(atr[7]<<8|atr[8])
   {
     case 0x5084: card="Generic"; break;
@@ -166,7 +174,7 @@ static int32_t seca_card_init(struct s_reader * reader, ATR *newatr)
     case 0x5284:
     case 0x5842:
     case 0x6060: card="Siemens"; break;
-    case 0x7070: card="Canal+ NL"; break;
+    case 0x7070: card="Mediaguard"; break;
     default:     card="Unknown"; break;
   }
   reader->caid=0x0100;
@@ -213,9 +221,11 @@ static int32_t get_prov_index(struct s_reader * rdr, const uint8_t *provid)	//re
 
 static int32_t seca_do_ecm(struct s_reader * reader, const ECM_REQUEST *er, struct s_ecm_answer *ea)
 {
-	if (er->ecm[3] == 0x00 && er->ecm[4] == 0x6a) { //provid 006A = CDNL uses seca2/seca3 simulcrypt on same caid
+	if (er->ecm[3] == 0x00 && er->ecm[4] == 0x6a) { //provid 006A = CDS NL uses seca2 and nagra/mediaguard3 crypt on same caid/provid only ecmpid is different
 		int seca_version = reader->card_atr[9]&0X0F; //Get seca cardversion from cardatr
 		if ((seca_version == 7) || (seca_version == 10)) { // we only proces V7 or V10 cards from CDS NL
+			if (seca_version == 7) reader->secatype = 2; // set the type of this reader to seca2
+			if (seca_version == 10) reader->secatype = 3; // set the type of this reader to nagra/mediaguard3
 			int ecm_type = seca_version; //assume ecm type same as card in reader
 			if (er->ecm[8] == 0x00) { //this is a mediaguard3 ecm request
 				ecm_type = 10; //flag it!
@@ -239,7 +249,8 @@ static int32_t seca_do_ecm(struct s_reader * reader, const ECM_REQUEST *er, stru
      return ERROR;
   }
 
-  if ((er->ecm[7] & 0x0F) != 0x0E && reader->availkeys[i][0] == 0) // if expired and not using OP Key 0E
+  struct seca_data *csystem_data = reader->csystem_data;
+  if ((er->ecm[7] & 0x0F) != 0x0E && !csystem_data->valid_provider[i]) // if expired and not using OP Key 0E
   {
      snprintf( ea->msglog, MSGLOGSIZE, "provider expired" );
      return ERROR;
@@ -279,7 +290,7 @@ static int32_t seca_do_ecm(struct s_reader * reader, const ECM_REQUEST *er, stru
   return OK;
 }
 
-static int32_t seca_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) //returns TRUE if shared emm matches SA, unique emm matches serial, or global or unknown
+static int32_t seca_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) //returns 1 if shared emm matches SA, unique emm matches serial, or global or unknown
 {
     rdr_debug_mask(rdr, D_EMM, "Entered seca_get_emm_type ep->emm[0]=%i",ep->emm[0]);
     int32_t i;
@@ -302,7 +313,7 @@ static int32_t seca_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) //return
         i=get_prov_index(rdr, ep->emm+3);
         rdr_debug_mask_sensitive(rdr, D_EMM, "SHARED, ep->hexserial = {%s}", cs_hexdump(1, ep->hexserial, 3, tmp_dbg, sizeof(tmp_dbg)));
         if (i== -1) //provider not found on this card
-            return FALSE; //do not pass this EMM
+            return 0; //do not pass this EMM
         rdr_debug_mask_sensitive(rdr, D_EMM, "SHARED, rdr->sa[%i] = {%s}", i, cs_hexdump(1, rdr->sa[i], 3, tmp_dbg, sizeof(tmp_dbg)));
         return (!memcmp (rdr->sa[i], ep->hexserial, 3));
         break;
@@ -312,7 +323,7 @@ static int32_t seca_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) //return
     case 0x83:
         ep->type = GLOBAL;
         rdr_debug_mask(rdr, D_EMM, "GLOBAL, PROVID: %04X",(ep->emm[3]<<8) | ep->emm[4]);
-        return (TRUE);
+        return 1;
         /* 	EMM-G manadge ppv by provid
          83 00 74 33 41 04 70 00 BF 20 A1 15 48 1B 88 FF
          CF F5 50 CB 6F E1 26 A2 70 02 8F D0 07 6A 13 F9
@@ -327,11 +338,11 @@ static int32_t seca_get_emm_type(EMM_PACKET *ep, struct s_reader * rdr) //return
     case 0x89:
         // 	EMM-G ?
         ep->type = UNKNOWN;
-        return FALSE;
+        return 0;
 
     default:
         ep->type = UNKNOWN;
-        return TRUE;
+        return 1;
     }
 }
 //use start filter dvbapi

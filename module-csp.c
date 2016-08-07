@@ -9,34 +9,19 @@
 
 #ifdef CS_CACHEEX
 
+#include "module-cacheex.h"
+#include "oscam-ecm.h"
+#include "oscam-net.h"
+
 #define TYPE_REQUEST   1
 #define TYPE_REPLY     2
 #define TYPE_PINGREQ   3
 #define TYPE_PINGRPL   4
 #define TYPE_RESENDREQ 5
 
-int32_t csp_ecm_hash_calc(uchar *buf, int32_t n)
-{
-	int32_t i = 0;
-	int32_t h = 0;
-    for (i = 0; i < n; i++) {
-    	h = 31*h + buf[i];
-    }
-    return h;
-}
-
-int32_t csp_ecm_hash(ECM_REQUEST *er)
-{
-	return csp_ecm_hash_calc(er->ecm+3, er->l-3);
-}
-
 static void * csp_server(struct s_client *client __attribute__((unused)), uchar *mbuf __attribute__((unused)), int32_t n __attribute__((unused)))
 {
 	return NULL;
-}
-
-static void csp_server_init(struct s_client * client) {
-	client->is_udp = 1;
 }
 
 static int32_t csp_recv(struct s_client *client, uchar *buf, int32_t l)
@@ -70,10 +55,12 @@ static int32_t csp_recv(struct s_client *client, uchar *buf, int32_t l)
 			er->srvid = srvid;
 			er->csp_hash = hash;
 			er->rc = E_FOUND;
-			memcpy(er->cw, buf+13, sizeof(er->cw));
+			if (chk_csp_ctab(er, &cfg.csp.filter_caidtab)) {
+				memcpy(er->cw, buf+13, sizeof(er->cw));
 
-			cs_ddump_mask(D_TRACE, er->cw, sizeof(er->cw), "received cw from csp caid=%04X srvid=%04X hash=%08X", caid, srvid, hash);
-			cs_add_cache(client, er, 1);
+				cs_ddump_mask(D_TRACE, er->cw, sizeof(er->cw), "received cw from csp caid=%04X srvid=%04X hash=%08X", caid, srvid, hash);
+				cacheex_add_to_cache_from_csp(client, er);
+			} else free(er);
     	  }
         break;
 
@@ -93,9 +80,10 @@ static int32_t csp_recv(struct s_client *client, uchar *buf, int32_t l)
 			er->srvid = srvid;
 			er->csp_hash = hash;
 			er->rc = E_UNHANDLED;
-
-			cs_ddump_mask(D_TRACE, buf, l, "received ecm request from csp caid=%04X srvid=%04X hash=%08X", caid, srvid, hash);
-			cs_add_cache(client, er, 1);
+			if (chk_csp_ctab(er, &cfg.csp.filter_caidtab) && cfg.csp.allow_request) {
+				cs_ddump_mask(D_TRACE, buf, l, "received ecm request from csp caid=%04X srvid=%04X hash=%08X", caid, srvid, hash);
+				cacheex_add_to_cache_from_csp(client, er);
+			} else free(er);
     	  }
         break;
 
@@ -159,22 +147,17 @@ static int32_t csp_recv(struct s_client *client, uchar *buf, int32_t l)
 //
 void module_csp(struct s_module *ph)
 {
-  static PTAB ptab; //since there is always only 1 csp server running, this is threadsafe
-  ptab.ports[0].s_port = cfg.csp_port;
-  ph->ptab = &ptab;
-  ph->ptab->nports = 1;
+  ph->ptab.nports = 1;
+  ph->ptab.ports[0].s_port = cfg.csp_port;
 
   ph->desc="csp";
   ph->type=MOD_CONN_UDP;
   ph->large_ecm_support = 1;
   ph->listenertype = LIS_CSPUDP;
-  ph->multi=1;
-  ph->s_ip=cfg.csp_srvip;
+  IP_ASSIGN(ph->s_ip, cfg.csp_srvip);
   ph->s_handler=csp_server;
-  ph->s_init=csp_server_init;
   ph->recv=csp_recv;
 //  ph->send_dcw=csp_send_dcw;
-  ph->c_multi=1;
 //  ph->c_init=csp_client_init;
 //  ph->c_recv_chk=csp_recv_chk;
 //  ph->c_send_ecm=csp_send_ecm;

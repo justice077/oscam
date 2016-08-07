@@ -47,43 +47,67 @@ description of reader, default:none
 <B>protocol</B> = <B>reader protocol</B>
 <DL COMPACT><DT><DD>
 reader protocol, <I>required</I>:
+<P>
+<BR>&nbsp;<B>camd35</B>|<B>cs357x</B>
+<BR>&nbsp;<B>cccam</B>
+<BR>&nbsp;<B>cs378x</B>
+<BR>&nbsp;<B>constcw</B>
+<BR>&nbsp;<B>gbox</B>
+<BR>&nbsp;<B>ghttp</B>
+<BR>&nbsp;<B>internal</B>
 <BR>&nbsp;<B>mouse</B>
 <BR>&nbsp;<B>mp35</B>
-<BR>&nbsp;<B>smartreader</B>
-<BR>&nbsp;<B>internal</B>
-<BR>&nbsp;<B>serial</B>
-<BR>&nbsp;<B>camd35</B>|<B>cs357x</B>
-<BR>&nbsp;<B>cs378x</B>
-<BR>&nbsp;<B>gbox</B>
 <BR>&nbsp;<B>newcamd</B>|<B>newcamd525</B>
 <BR>&nbsp;<B>newcamd524</B>
-<BR>&nbsp;<B>cccam</B>
-<BR>&nbsp;<B>radegast</B>
-<BR>&nbsp;<B>pcsc</B>
-<BR>&nbsp;<B>constcw</B>
+<BR>&nbsp;<B>pcsc</B>&nbsp;
+<BR>&nbsp;<B>radegast</B>&nbsp;
 <BR>&nbsp;<B>sc8in1</B>
+<BR>&nbsp;<B>serial</B>
+<BR>&nbsp;<B>smargo</B>&nbsp;
+<BR>&nbsp;<B>smartreader</B>
 </DL>
 
 <P>
 
-<B>device</B> = <B>&lt;device|bus:device|device:slot&gt;</B>|Serial:Reader <B>serial</B>|<B>&lt;ip|hostname&gt;,&lt;port&gt;[,&lt;lport&gt;]</B>|<B>pcsc</B>|&lt;<B>0|1</B>&gt;|<B>constantcw</B>
+<B>device</B> = <B>[&lt;readertype&gt;;]serial:serialnum|bus:device</B>|
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>&lt;device|device:slot&gt;</B>|
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>&lt;ip|hostname&gt;,&lt;port&gt;[,&lt;lport&gt;]</B>|
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>&lt;ip|hostname&gt;,&lt;gboxpport&gt;,&lt;gboxlport&gt;</B>|
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>pcsc</B>|
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>&lt;0|1&gt;</B>&gt;|
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>constantcw</B>
 <DL COMPACT><DT><DD>
 define local or remote reader
 <P>
-<BR>&nbsp;<B>device</B>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;device&nbsp;name
+<BR>&nbsp;<B>readertype</B>:&nbsp;&nbsp;set&nbsp;reader&nbsp;type
 <P>
-<BR>&nbsp;<B>bus:device</B>:&nbsp;&nbsp;bus&nbsp;name&nbsp;and&nbsp;device&nbsp;name&nbsp;of&nbsp;the&nbsp;Smartreader+
-<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(get&nbsp;the&nbsp;names&nbsp;with&nbsp;lsusb&nbsp;'Bus'&nbsp;and&nbsp;'Device')
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>SR</B>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Smartreader+&nbsp;(default)
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>Infinity</B>:&nbsp;Infinity&nbsp;USB
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>TripleP1</B>:&nbsp;Smargo&nbsp;Triple&nbsp;Reader&nbsp;port&nbsp;1
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>TripleP2</B>:&nbsp;Smargo&nbsp;Triple&nbsp;Reader&nbsp;port&nbsp;2
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>TripleP3</B>:&nbsp;Smargo&nbsp;Triple&nbsp;Reader&nbsp;port&nbsp;3
+<P>
+<BR>&nbsp;<B>bus:device</B>:&nbsp;&nbsp;bus&nbsp;name&nbsp;and&nbsp;device&nbsp;name&nbsp;of&nbsp;the&nbsp;Smartreader+&nbsp;or&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Infinity&nbsp;USB&nbsp;(get&nbsp;the&nbsp;names&nbsp;with&nbsp;lsusb&nbsp;'Bus'&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;'Device')
+<P>
+<BR>&nbsp;<B>serialnum</B>:&nbsp;&nbsp;&nbsp;serial&nbsp;number&nbsp;of&nbsp;reader&nbsp;of&nbsp;the&nbsp;Smartreader+&nbsp;or&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Infinity&nbsp;USB
+<P>
+<BR>&nbsp;<B>device</B>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;device&nbsp;name
 <P>
 <BR>&nbsp;<B>device:slot</B>:&nbsp;device&nbsp;name&nbsp;and&nbsp;slot&nbsp;number&nbsp;sc8in1&nbsp;[1-8]
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<I>(only&nbsp;one&nbsp;SC8in1&nbsp;reader&nbsp;supported)</I>
 <P>
-<BR>&nbsp;<B>serial</B>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serial&nbsp;number&nbsp;of&nbsp;Smartreader+
-<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(get&nbsp;the&nbsp;serial&nbsp;number&nbsp;while&nbsp;starting&nbsp;OSCam)
+<BR>&nbsp;<B>ip</B>|<B>hostname</B>:&nbsp;IP&nbsp;address&nbsp;or&nbsp;host&nbsp;name
 <P>
 <BR>&nbsp;<B>port</B>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TCP/IP&nbsp;port
 <P>
 <BR>&nbsp;<B>lport</B>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remapping&nbsp;to&nbsp;local&nbsp;TCP/IP&nbsp;port
+<P>
+<BR>&nbsp;<B>gboxpport</B>:&nbsp;&nbsp;&nbsp;TCP/IP&nbsp;port&nbsp;for&nbsp;remote&nbsp;gbox&nbsp;peer
+<P>
+<BR>&nbsp;<B>gboxlport</B>:&nbsp;&nbsp;&nbsp;TCP/IP&nbsp;port&nbsp;for&nbsp;local&nbsp;gbox&nbsp;peer
 <P>
 <BR>&nbsp;<B>PCSC</B>:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;number&nbsp;of&nbsp;PCSC&nbsp;reader,&nbsp;starting&nbsp;with&nbsp;0
 <P>
@@ -141,16 +165,6 @@ set card init mode for AzBox internal reader, default:none
 
 <P>
 
-<B>device_out_endpoint</B> = <B>address</B>
-<DL COMPACT><DT><DD>
-set endpoint address for FTDI chips,default:0x82
-<P>
-<BR>&nbsp;<B>0x81</B>:&nbsp;Infinity&nbsp;USB&nbsp;Smart
-<BR>&nbsp;<B>0x82</B>:&nbsp;Smartreader+&nbsp;(default)
-</DL>
-
-<P>
-
 <B>smargopatch</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
 1 = enable workaround for Smartreader+ reader until native mode works, default:0
@@ -174,14 +188,14 @@ set endpoint address for FTDI chips,default:0x82
 
 <B>cool_timeout_init</B> = <B>timeout</B>
 <DL COMPACT><DT><DD>
-set timeout for SC init in milli-seconds for Coolstream internal reader only, default:50
+set timeout for SC init in milli-seconds for Coolstream internal reader only, default:0
 </DL>
 
 <P>
 
 <B>cool_timeout_after_init</B> = <B>timeout</B>
 <DL COMPACT><DT><DD>
-set read/transmit timeout after SC init in milli-seconds for Coolstream internal reader only, default:150
+set read/transmit timeout after SC init in milli-seconds for Coolstream internal reader only, default:0
 </DL>
 
 <P>
@@ -211,9 +225,9 @@ set TA1 byte for NDS Videoguard 2 SCs, valid for physical readers only, default:
 <DL COMPACT><DT><DD>
 read Nagravison records (on NCMED cards only):
 <P>
-<BR>&nbsp;&nbsp;<B>0</B>&nbsp;=&nbsp;disabled&nbsp;(default)
-<BR>&nbsp;&nbsp;<B>1</B>&nbsp;=&nbsp;read&nbsp;all&nbsp;records&nbsp;with&nbsp;expired&nbsp;rights
-<BR>&nbsp;&nbsp;<B>2</B>&nbsp;=&nbsp;read&nbsp;records&nbsp;with&nbsp;valid&nbsp;rights&nbsp;only
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;disabled&nbsp;(default)
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;read&nbsp;all&nbsp;records&nbsp;with&nbsp;expired&nbsp;rights
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;read&nbsp;records&nbsp;with&nbsp;valid&nbsp;rights&nbsp;only
 </DL>
 
 <P>
@@ -288,23 +302,16 @@ key for newcamd remote reader encryption
 
 <P>
 
-<B>account</B> = <B>user,password</B> <I>(delimiter not allowed, obsolete)</I>
-<DL COMPACT><DT><DD>
-user and password for remote reader, overrides password of <B>password</B>, first come first serve
-</DL>
-
-<P>
-
 <B>user</B> = <B>name</B>
 <DL COMPACT><DT><DD>
-user for remote reader, overrides user of <B>account</B>, first come first serve
+user for remote reader
 </DL>
 
 <P>
 
 <B>password</B> = <B>password</B>
 <DL COMPACT><DT><DD>
-password for remote reader, overrides password of <B>account</B>, first come first serve
+password for remote reader
 </DL>
 
 <P>
@@ -395,14 +402,21 @@ example: auprovid = 123456
 
 <B>inactivitytimeout</B> = <B>seconds</B>
 <DL COMPACT><DT><DD>
-inactivity timeout for all TCP based remote readers, default:30 for CCCam, 0 for all others
+inactivity timeout for all TCP based remote readers, -1 = reconnect on network failure for newcamd based readers, even in idle, default:0
 </DL>
 
 <P>
 
 <B>reconnecttimeout</B> = <B>seconds</B>
 <DL COMPACT><DT><DD>
-reconnect if missing answers for all TCP based remote readers, default:30
+reconnect if missing answers from a remote reader, default:30
+</DL>
+
+<P>
+
+<B>connectoninit</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = allow newcamd connections to be established on startup although there isn't a request yet, default:0
 </DL>
 
 <P>
@@ -437,6 +451,15 @@ set EMM cache of local reader:
 
 <P>
 
+<B>emmreassembly</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = enable EMM reassembly, should be set for Viaccess and Cryptoworks readers 
+if the client that you are using to send EMMs is reassembling them instead of 
+just sending them to OSCam for processing, default:1
+</DL>
+
+<P>
+
 <B>cacheex</B> = <B>0</B>|<B>1</B>|<B>2</B>|<B>3</B>
 <DL COMPACT><DT><DD>
 set cache exchange mode
@@ -462,9 +485,23 @@ define maximum hops for cache exchange, default=10
 
 <P>
 
-<B>logport</B> = <B>0</B>|<B>port</B>
+<B>csp_ecm_filter</B> = <B>[caid][&amp;mask][@provid][$servid],n</B>
 <DL COMPACT><DT><DD>
-camd 3.x reader logport, camd 3.x UDP must be activated, only works if there's no camd 3.x cascading, 0 = disabled, default=0
+cache exchange incoming ECM filter setting (mode 2 only) for Cardservproxy, default:none
+</DL>
+
+<P>
+
+<B>cacheex_drop_csp</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+drop incoming Cardservproxy cache (mode 2 only), detection is zero ecmd5, default:0
+</DL>
+
+<P>
+
+<B>cacheex_allow_request</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+allow incoming ECM request (mode 2), default:1
 </DL>
 
 <P>
@@ -481,9 +518,23 @@ example: ecmwhitelist = 10,20,0a,0b
 
 <P>
 
+<B>ecmheaderwhitelist</B> = [<B>CAID</B>[@<B>provid</B>]:]<B>header</B>[,<B>header</B>]...[;[<B>CAID</B>[@<B>provid</B>]:]<B>header</B>[,<B>header</B>]...]...
+<DL COMPACT><DT><DD>
+set vaild ECM header per CAID and provid in hex, default:none,provid=000000
+</DL>
+
+<P>
+
 <B>ratelimitecm</B> = <B>count</B>
 <DL COMPACT><DT><DD>
 number of different SIDs in ECMs allowed for an interval, default:0
+</DL>
+
+<P>
+
+<B>ecmnotfoundlimit</B> = <B>count</B>
+<DL COMPACT><DT><DD>
+number of ECMs with &quot;not found&quot; answer until the reader will be restarted, 0 = no limit, default:0
 </DL>
 
 <P>
@@ -509,9 +560,32 @@ interval for rate limit, default:0
 
 <P>
 
+<B>ecmunique</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = enable check for matching ECM hash in ratelimit slot , default:0
+</DL>
+
+<P>
+
+<B>srvidholdseconds </B> = <B>seconds</B>
+<DL COMPACT><DT><DD>
+time to keep service ID in ratelimit slot, during this time checkeding for ecmunique is disbaled, default:0
+</DL>
+
+<P>
+
 <B>cooldown</B> = <B>delay</B>,<B>duration</B>
 <DL COMPACT><DT><DD>
-activate ratelimitecm and ratelimitseconds parameters after specified delay for specified duration in seconds, <I>ratelimitecm and ratelimitseconds are required</I>, default:none
+<BR>&nbsp;define&nbsp;cooldown:
+<P>
+<BR>&nbsp;<B>delay</B>:&nbsp;&nbsp;&nbsp;&nbsp;delay&nbsp;in&nbsp;seconds&nbsp;for&nbsp;which&nbsp;the&nbsp;reader&nbsp;is&nbsp;allowed&nbsp;to&nbsp;do&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;more&nbsp;ECM&nbsp;requests&nbsp;than&nbsp;defined&nbsp;by&nbsp;ecmratelimit,&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:&nbsp;none&nbsp;
+<P>
+<BR>&nbsp;<B>duration</B>:&nbsp;duration&nbsp;in&nbsp;seconds&nbsp;the&nbsp;reader&nbsp;needs&nbsp;to&nbsp;cooldown,&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:none
+<P>
+<I>ratelimitecm and ratelimitseconds are required</I>
 </DL>
 
 <P>
@@ -705,6 +779,41 @@ reconnect again after ECM request timeout in milli-seconds, default:4000
 filters all readers with hops smaller than number, default:0
 </DL>
 
+<P>
+
+<B>gbox_my_password</B> = <B>password</B>
+<DL COMPACT><DT><DD>
+password for connection to local gbox peer, default:none
+</DL>
+
+<P>
+
+<B>gbox_reshare</B> = <B>level</B>
+<DL COMPACT><DT><DD>
+gbox reshare level of local cards, default:0
+</DL>
+
+<P>
+
+<B>gbox_max_distance</B> = <B>distance</B>
+<DL COMPACT><DT><DD>
+maximum distance to receive gbox peer cards, default:2
+</DL>
+
+<P>
+
+<B>gbox_max_ecm_send</B> = <B>number</B>
+<DL COMPACT><DT><DD>
+maximum of gbox peers ECMs will be send to, default:3
+</DL>
+
+<P>
+
+<B>gbox_group</B> = <B></B>
+<DL COMPACT><DT><DD>
+reader assingment to gbox group, default:none
+</DL>
+
 <A NAME="lbAF">&nbsp;</A>
 <H2>OVERCLOCKING</H2>
 
@@ -735,8 +844,14 @@ OSCam can not set the frequency of the reader.
 <DT>&bull;<DD>
 Smargo Smartreader+
 <P>
+Use protocol = smargo for the FDDI kernel drivers (no libusb needed) or (not 
+recommended) use protocol = smartreader for OSCam's driver implementation 
+based on libusb.
+<P>
 Set the reader frequency with the native Smargo Smartreader+ tool (srp_tools). 
-Do not set <B>mhz</B> and <B>cardmhz</B>.
+If not setting <B>mhz</B> and <B>cardmhz</B>, OSCam  tries  to  set the baudrate 
+automatically, according to the maximum speed indicated by ATR. Overclocking 
+is possible.
 </DL>
 <P>
 
@@ -882,13 +997,13 @@ constant CW
 gbox reader
 <P>
 <BR>&nbsp;[reader]
-<BR>&nbsp;label&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;mygboxreader
-<BR>&nbsp;protocol&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;gbox
-<BR>&nbsp;device&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;192.168.0.4,45678,56789
-<BR>&nbsp;user&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;user4
-<BR>&nbsp;password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;password4
-<BR>&nbsp;group&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;11
-<BR>&nbsp;caid&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;1100
+<BR>&nbsp;label&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;mygboxreader
+<BR>&nbsp;protocol&nbsp;=&nbsp;gbox
+<BR>&nbsp;device&nbsp;&nbsp;&nbsp;=&nbsp;192.168.0.4,45678,56789
+<BR>&nbsp;user&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;user4
+<BR>&nbsp;password&nbsp;=&nbsp;password4
+<BR>&nbsp;group&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;11
+<BR>&nbsp;caid&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;1100
 </DL>
 <A NAME="lbAI">&nbsp;</A>
 <H2>SEE ALSO</H2>

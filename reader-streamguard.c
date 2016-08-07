@@ -1,4 +1,5 @@
 #include "globals.h"
+#ifdef READER_STREAMGUARD
 #include "reader-common.h"
 
 static int32_t streamguard_read_data(struct s_reader *reader, uchar size, uchar *cta_res, uint16_t *status)
@@ -79,10 +80,10 @@ static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er
   char *tmp;
 
   if((ecm_len = check_sct_len(er->ecm, 3)) < 0) return ERROR;
-	if(cs_malloc(&tmp, ecm_len * 3 + 1, -1)){
-		cs_debug_mask(D_IFD, "ECM: %s", cs_hexdump(1, er->ecm, ecm_len, tmp, ecm_len * 3 + 1));
-		free(tmp);
-	}
+  if(cs_malloc(&tmp, ecm_len * 3 + 1)){
+	cs_debug_mask(D_IFD, "ECM: %s", cs_hexdump(1, er->ecm, ecm_len, tmp, ecm_len * 3 + 1));
+	free(tmp);
+  }
 
   write_len = er->ecm[2] + 3;
   ecm_cmd[4] = write_len;
@@ -139,7 +140,7 @@ static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er
     memcpy(ea->cw + 12, pbuf + 6 + 8 + 4 + 1 + 1, 4);
   }
 
-  return OK;
+  return TRUE;
 }
 
 static int32_t streamguard_get_emm_type(EMM_PACKET *ep, struct s_reader *UNUSED(reader))
@@ -184,3 +185,4 @@ void reader_streamguard(struct s_cardsystem *ph)
 	ph->caids[0]=0x4A;
 	ph->desc="streamguard";
 }
+#endif

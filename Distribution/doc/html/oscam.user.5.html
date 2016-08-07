@@ -116,13 +116,24 @@ level of penalty, default: level of oscam.conf:
 
 <P>
 
-<B>failban</B> = <B>0</B>|<B>2</B>|<B>4</B>
+<B>fakedelay</B> = <B>0</B>|<B>1</B>|<B>milli-seconds</B>
 <DL COMPACT><DT><DD>
-mask for IP based blocking:
+set fake delay time individually for user:
+<P>
+<BR>&nbsp;<B>&nbsp;0</B>&nbsp;=&nbsp;disable&nbsp;fake&nbsp;delay
+<BR>&nbsp;<B>-1</B>&nbsp;=&nbsp;fake&nbsp;delay&nbsp;of&nbsp;oscam.conf&nbsp;(default)
+</DL>
+
+<P>
+
+<B>failban</B> = <B>0</B>|<B>2</B>|<B>4</B>|<B>8</B>
+<DL COMPACT><DT><DD>
+mask for IP address based blocking:
 <P>
 <BR>&nbsp;<B>0</B>&nbsp;=&nbsp;ignore&nbsp;(default)
-<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;block&nbsp;IP&nbsp;of&nbsp;a&nbsp;disabled&nbsp;account&nbsp;on&nbsp;connecting
-<BR>&nbsp;<B>4</B>&nbsp;=&nbsp;block&nbsp;IP&nbsp;of&nbsp;a&nbsp;sleeping&nbsp;account&nbsp;while&nbsp;sleeping&nbsp;comes&nbsp;up
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;block&nbsp;IP&nbsp;address&nbsp;of&nbsp;a&nbsp;disabled&nbsp;account&nbsp;on&nbsp;connecting
+<BR>&nbsp;<B>4</B>&nbsp;=&nbsp;block&nbsp;IP&nbsp;address&nbsp;of&nbsp;a&nbsp;sleeping&nbsp;account&nbsp;while&nbsp;sleeping&nbsp;comes&nbsp;up
+<BR>&nbsp;<B>8</B>&nbsp;=&nbsp;block&nbsp;duplicate&nbsp;IP&nbsp;address
 </DL>
 
 <P>
@@ -148,6 +159,27 @@ set cache exchange mode
 <B>cacheex_maxhop</B> = <B>hops</B>
 <DL COMPACT><DT><DD>
 define maximum hops for cache exchange, default=10
+</DL>
+
+<P>
+
+<B>csp_ecm_filter</B> = <B>[caid][&amp;mask][@provid][$servid],n</B>
+<DL COMPACT><DT><DD>
+cache exchange incoming ECM filter setting (mode 3 only) for Cardservproxy, default:none
+</DL>
+
+<P>
+
+<B>cacheex_drop_csp</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+drop incoming Cardservproxy cache (mode 3 only), detection is zero ecmd5, default:0
+</DL>
+
+<P>
+
+<B>cacheex_allow_request</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+allow incoming ECM request (mode 3 only), default:1
 </DL>
 
 <P>
@@ -261,9 +293,9 @@ user assingment to SC specific ChIDs, default:none
 <DL COMPACT><DT><DD>
 monitor level:
 <P>
-<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;no&nbsp;access&nbsp;to&nbsp;monitor
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;no&nbsp;access&nbsp;to&nbsp;monitor&nbsp;(default)
 <BR>&nbsp;<B>1</B>&nbsp;=&nbsp;only&nbsp;server&nbsp;and&nbsp;own&nbsp;procs
-<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;all&nbsp;procs,&nbsp;but&nbsp;viewing&nbsp;only&nbsp;(default)
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;all&nbsp;procs,&nbsp;but&nbsp;viewing&nbsp;only
 <BR>&nbsp;<B>3</B>&nbsp;=&nbsp;all&nbsp;procs,&nbsp;reload&nbsp;of&nbsp;<B>oscam.user</B>&nbsp;possible
 <BR>&nbsp;<B>4</B>&nbsp;=&nbsp;complete&nbsp;access
 </DL>

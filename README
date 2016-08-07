@@ -6,7 +6,7 @@ License
 =======
 
 OSCam: Open Source CAM
-Copyright (C) 2009-2012 OSCam developers
+Copyright (C) 2009-2013 OSCam developers
 
 OSCam is based on the Streamboard mp-cardserver 0.9d by dukat and
 has been extended and worked on by many more since then.
@@ -32,24 +32,21 @@ Version history
 ===============
 
 OSCam history is accessible through Trac timeline at:
-   http://streamboard.gmc.to/oscam/timeline/
+   http://www.streamboard.tv/oscam/timeline/
 
 
 Repositories
 ============
 
 SVN repository:
-   svn checkout http://streamboard.gmc.to/svn/oscam/trunk oscam-svn
-
-SVN mirror:
-   svn checkout http://oscam.to/svn/oscam/trunk oscam-mirror
+   svn checkout http://www.streamboard.tv/svn/oscam/trunk oscam-svn
 
 
 Building OSCam from source
 ==========================
 
  - Get the lastest sources from SVN
-    svn checkout http://streamboard.gmc.to/svn/oscam/trunk oscam-trunk
+    svn checkout http://www.streamboard.tv/svn/oscam/trunk oscam-trunk
 
  - Go to oscam-trunk directory.
 
@@ -57,7 +54,8 @@ Building OSCam from source
 
  - Run `make` to compile OSCam.
 
-For more information and examples on using the build system, run `make help`.
+For more information and examples on using the build system, please
+see README.build and README.config files.
 
 
 Building OScam for different CPUs (cross-compilation)
@@ -66,7 +64,7 @@ Building OScam for different CPUs (cross-compilation)
 First you need to install the target CPU toolchain. Already built toolchains
 for various architectures can be downloaded from:
 
-    http://streamboard.gmc.to/oscam/wiki/crosscompiling/
+    http://www.streamboard.tv/oscam/wiki/crosscompiling/
 
 In order to cross compile OSCam you need to set CROSS variable when
 running make. For example to compile for SH4 architecture you need
@@ -91,19 +89,9 @@ OSCam supports building with the following external dependencies:
 
 For STAPI support you need to download liboscam_stapi.a library and place
 it in stapi directory under oscam/ root dir. liboscam_stapi.a can be downloaded
-from: http://streamboard.gmc.to/wbb2/thread.php?threadid=28854
+from: http://www.streamboard.tv/wbb2/thread.php?threadid=28854
 
 For more information and examples on using the build system, run `make help`.
-
-
-Web links
-=========
-
-Build server for automated builds:
-   http://download.oscam.to/index.php
-
-Configuration wiki:
-   http://streamboard.gmc.to/wiki/index.php/OSCam/
 
 
 Help and Support
@@ -111,13 +99,12 @@ Help and Support
 
 man pages and configuration examples are in Distribution/doc directory.
 
+You may visit our Trac system for tracking and filling bug reports.
+   http://www.streamboard.tv/oscam/
+
 If you experience any problems with OSCam, feel free to post in our support
 forum under (mainly German and English language) at:
-   http://streamboard.gmc.to/wbb2/portal.php
+   http://www.streamboard.tv/wbb2/portal.php
 
-Support for international (mainly French and Italian language) users can be
-found at:
-   http://oscam.to/wbb3/index.php
-
-You may also visit our Trac system for tracking and filing bug reports:
-   http://streamboard.gmc.to/oscam
+Configuration wiki:
+   http://www.streamboard.tv/wiki/index.php/OSCam/

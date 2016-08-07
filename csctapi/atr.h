@@ -25,11 +25,11 @@
 #ifndef _ATR_
 #define _ATR_
 
-#include "defines.h"
-
 /*
  * Exported constants definition
  */
+#define ATR_TIMEOUT			1000000
+#define DEFAULT_BAUDRATE	9600
 
 /* Return values */
 #define ATR_OK		0	/* ATR could be parsed and data returned */
@@ -79,16 +79,16 @@
 typedef struct s_ATR
 {
   unsigned length;
-  BYTE TS;
-  BYTE T0;
+  unsigned char TS;
+  unsigned char T0;
   struct
   {
-    BYTE value;
+    unsigned char value;
     bool present;
   }
   ib[ATR_MAX_PROTOCOLS][ATR_MAX_IB], TCK;
   unsigned pn;
-  BYTE hb[ATR_MAX_HISTORICAL];
+  unsigned char hb[ATR_MAX_HISTORICAL];
   unsigned hbn;
 }
 ATR;
@@ -100,30 +100,43 @@ ATR;
 extern const uint32_t atr_fs_table[16];
 extern const uint32_t atr_f_table[16];
 extern const double atr_d_table[16];
-extern const uint32_t atr_i_table[4];
 
 /*
  * Exported functions declaraton
  */
 
 /* Initialization */
-int32_t ATR_InitFromArray (ATR * atr, const BYTE buffer[ATR_MAX_SIZE], uint32_t length);
+int32_t ATR_InitFromArray (ATR * atr, const unsigned char buffer[ATR_MAX_SIZE], uint32_t length);
 
 /* General smartcard characteristics */
 int32_t ATR_GetConvention (ATR * atr, int32_t *convention);
 int32_t ATR_GetNumberOfProtocols (ATR * atr, uint32_t *number_protocols);
-int32_t ATR_GetProtocolType (ATR * atr, uint32_t number_protocol, BYTE *protocol_type);
+int32_t ATR_GetProtocolType (ATR * atr, uint32_t number_protocol, unsigned char *protocol_type);
 
 /* ATR parameters and integer values */
-int32_t ATR_GetInterfaceByte (ATR * atr, uint32_t number, int32_t character, BYTE * ib);
-int32_t ATR_GetIntegerValue (ATR * atr, int32_t name, BYTE * value);
-int32_t ATR_GetParameter (ATR * atr, int32_t name, double *parameter);
-int32_t ATR_GetHistoricalBytes (ATR * atr, BYTE * hist, uint32_t *length);
-int32_t ATR_GetCheckByte (ATR * atr, BYTE * check_byte);
+int32_t ATR_GetInterfaceByte (ATR * atr, uint32_t number, int32_t character, unsigned char * ib);
+int32_t ATR_GetIntegerValue (ATR * atr, int32_t name, unsigned char * value);
+int32_t ATR_GetParameter (ATR * atr, int32_t name, uint32_t *parameter);
+int32_t ATR_GetHistoricalBytes (ATR * atr, unsigned char * hist, uint32_t *length);
+int32_t ATR_GetCheckByte (ATR * atr, unsigned char * check_byte);
 int32_t ATR_GetFsMax (ATR * atr, uint32_t *fsmax);
 
 /* Raw ATR retrieving */
-int32_t ATR_GetRaw (ATR * atr, BYTE * buffer, uint32_t *lenght);
+int32_t ATR_GetRaw (ATR * atr, unsigned char * buffer, uint32_t *lenght);
 int32_t ATR_GetSize (ATR * atr, uint32_t *size);
+
+/* Invert order of bits in a byte: b7->b0, b0->b7 */
+#ifndef INVERT_BYTE
+#define INVERT_BYTE(a) ( \
+	(((a) << 7) & 0x80) | \
+	(((a) << 5) & 0x40) | \
+	(((a) << 3) & 0x20) | \
+	(((a) << 1) & 0x10) | \
+	(((a) >> 1) & 0x08) | \
+	(((a) >> 3) & 0x04) | \
+	(((a) >> 5) & 0x02) | \
+	(((a) >> 7) & 0x01)   \
+)
+#endif
 
 #endif /* _ATR_ */

@@ -68,7 +68,7 @@ cross-powerpc-405-linux:
 	$(MAKE) --no-print-directory \
 		CROSS=powerpc-405-linux-gnu- \
 		CONF_DIR=/var/tuxbox/config \
-		EXTRA_FLAGS="-DSTB04SCI"
+		EXTRA_FLAGS="-DSTB04SCI=1"
 		$(MAKEFLAGS)
 
 cross-sh4-linux:
@@ -89,6 +89,22 @@ cross-i386-pc-cygwin:
 		CROSS=i686-pc-cygwin- \
 		EXTRA_FLAGS="-static" \
 		$(MAKEFLAGS)
+
+cross-i386-pc-cygwin-pcsc:
+	@-$(MAKE) --no-print-directory \
+		-f Maketype TYP=$(subst cross-,,$@) \
+		OS_LIBS="-lcrypto -lm -lwinscard" \
+		OS_CULI="-lncurses" \
+		OS_PTLI="-lpthread" \
+		DS_OPTS="-O2 -DOS_CYGWIN32 -DWITH_LIBCRYPTO -D_WIN32 -DCS_CONFDIR=${CS_CONFDIR} -static -DHAVE_PCSC=1 -D'CS_SVN_VERSION="\"$(SVN_REV)\""'" \
+		DS_CFLAGS="-c" \
+		DS_LDFLAGS="" \
+		DS_ARFLAGS="-rvsl" \
+		DS_CC=i686-pc-cygwin-gcc \
+		DS_AR=i686-pc-cygwin-ar \
+		DS_LD=i686-pc-cygwin-ld \
+		DS_RL=i686-pc-cygwin-ranlib \
+		DS_ST=i686-pc-cygwin-strip
 
 i386-pc-cygwin:
 	$(MAKE) --no-print-directory \
@@ -209,6 +225,13 @@ azbox:
 		USE_AZBOX=1 \
 		$(MAKEFLAGS)
 
+mca:
+	$(MAKE) --no-print-directory \
+		CROSS=arm-none-linux-gnueabi- \
+		CONF_DIR=/var/mca/d1 \
+		USE_MCA=1 \
+		$(MAKEFLAGS)
+
 cool:
 	$(MAKE) --no-print-directory \
 		CROSS=arm-cx2450x-linux-gnueabi- \
@@ -222,7 +245,53 @@ coolstream: cool
 dockstar:
 	$(MAKE) --no-print-directory \
 		CROSS=arm-openwrt-linux-uclibcgnueabi- \
-		EXTRA_FLAGS=-DDOCKSTAR \
-		PLUS_TARGET=-dockstar \
 		CONF_DIR=/jffs/etc/config/oscam \
+		$(MAKEFLAGS)
+
+qboxhd:
+	$(MAKE) --no-print-directory \
+		CROSS=sh4-linux- \
+		EXTRA_FLAGS="-DQBOXHD=1" \
+		PLUS_TARGET=-qboxhd \
+		CONF_DIR=/var/tuxbox/config \
+		$(MAKEFLAGS)
+
+static:
+	$(MAKE) --no-print-directory \
+		EXTRA_FLAGS=-static \
+		EXTRA_TARGET=-static \
+		$(MAKEFLAGS)
+
+static-libusb:
+	$(MAKE) --no-print-directory \
+		USE_LIBUSB=1 \
+		LIBUSB_LIB=/usr/lib/libusb-1.0.a \
+		EXTRA_TARGET=-static \
+		$(MAKEFLAGS)
+
+static-libcrypto:
+	$(MAKE) --no-print-directory \
+		USE_LIBCRYPTO=1 \
+		LIBCRYPTO_LIB=/usr/lib/libcrypto.a \
+		EXTRA_TARGET=-static \
+		$(MAKEFLAGS)
+
+static-ssl:
+	$(MAKE) --no-print-directory \
+		USE_SSL=1 \
+		SSL_LIB=/usr/lib/libssl.a \
+		LIBCRYPTO_LIB=/usr/lib/libcrypto.a \
+		EXTRA_TARGET=-static \
+		$(MAKEFLAGS)
+
+android-arm:
+	$(MAKE) --no-print-directory \
+		LIB_PTHREAD= \
+		CROSS=arm-linux-androideabi- \
+		$(MAKEFLAGS)
+
+uclinux:
+	$(MAKE) --no-print-directory \
+		LIB_DL= STRIP=true \
+		CROSS=m68k-uclinux- \
 		$(MAKEFLAGS)

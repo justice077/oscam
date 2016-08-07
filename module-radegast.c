@@ -1,5 +1,10 @@
 #include "globals.h"
 #ifdef MODULE_RADEGAST
+#include "oscam-client.h"
+#include "oscam-ecm.h"
+#include "oscam-net.h"
+#include "oscam-string.h"
+#include "oscam-reader.h"
 
 static int32_t radegast_send(struct s_client * client, uchar *buf)
 {
@@ -43,7 +48,7 @@ static int32_t radegast_recv_chk(struct s_client *client, uchar *dcw, int32_t *r
   return (-1);
 }
 
-static void radegast_auth_client(in_addr_t ip)
+static void radegast_auth_client(IN_ADDR_T ip)
 {
   int32_t ok;
   struct s_auth *account;
@@ -58,9 +63,9 @@ static void radegast_auth_client(in_addr_t ip)
     cs_disconnect_client(cl);
   }
 
-  for (ok=0, account=cfg.account; (cfg.rad_usr[0]) && (account) && (!ok); account=account->next)
+  for (ok = 0, account = cfg.account; cfg.rad_usr && account && !ok; account = account->next)
   {
-    ok=(!strcmp(cfg.rad_usr, account->usr));
+    ok = streq(cfg.rad_usr, account->usr);
     if (ok && cs_auth_client(cl, account, NULL))
        cs_disconnect_client(cl);
   }
@@ -109,8 +114,8 @@ static void radegast_process_ecm(uchar *buf, int32_t l)
         er->caid=b2i(2, buf+i+2);
         break;
       case  3:		// ECM DATA
-        er->l=sl;
-        memcpy(er->ecm, buf+i+2, er->l);
+        er->ecmlen = sl;
+        memcpy(er->ecm, buf+i+2, er->ecmlen);
         break;
       case  6:		// PROVID (ASCII)
         n=(sl>6) ? 3 : (sl>>1);
@@ -162,10 +167,11 @@ static int32_t radegast_send_ecm(struct s_client *client, ECM_REQUEST *er, uchar
   uchar provid_buf[8];
   uchar header[22] = "\x02\x01\x00\x06\x08\x30\x30\x30\x30\x30\x30\x30\x30\x07\x04\x30\x30\x30\x38\x08\x01\x02";
   uchar *ecmbuf;
-  if(!cs_malloc(&ecmbuf,er->l + 30, -1)) return -1;
+  if (!cs_malloc(&ecmbuf, er->ecmlen + 30))
+    return -1;
 
   ecmbuf[0] = 1;
-  ecmbuf[1] = er->l + 30 - 2;
+  ecmbuf[1] = er->ecmlen + 30 - 2;
   memcpy(ecmbuf + 2, header, sizeof(header));
   for(n = 0; n < 4; n++) {
     snprintf((char*)provid_buf+(n*2), sizeof(provid_buf)-(n*2), "%02X", ((uchar *)(&er->prid))[4 - 1 - n]);
@@ -183,15 +189,15 @@ static int32_t radegast_send_ecm(struct s_client *client, ECM_REQUEST *er, uchar
   ecmbuf[4 + sizeof(header)] = er->caid >> 8;
   ecmbuf[5 + sizeof(header)] = er->caid & 0xff;
   ecmbuf[6 + sizeof(header)] = 3;
-  ecmbuf[7 + sizeof(header)] = er->l;
-  memcpy(ecmbuf + 8 + sizeof(header), er->ecm, er->l);
+  ecmbuf[7 + sizeof(header)] = er->ecmlen;
+  memcpy(ecmbuf + 8 + sizeof(header), er->ecm, er->ecmlen);
   ecmbuf[4] = er->caid >> 8;
 
   client->reader->msg_idx = er->idx;
-  n = send(client->pfd, ecmbuf, er->l + 30, 0);
+  n = send(client->pfd, ecmbuf, er->ecmlen + 30, 0);
 
   cs_debug_mask(D_TRACE,"radegast: sending ecm");
-  cs_ddump_mask(D_CLIENT, ecmbuf, er->l + 30, "ecm:");
+  cs_ddump_mask(D_CLIENT, ecmbuf, er->ecmlen + 30, "ecm:");
 
   free(ecmbuf);
 
@@ -221,7 +227,7 @@ int32_t radegast_cli_init(struct s_client *cl)
 
 static void radegast_server_init(struct s_client *cl) {
 	if (!cl->init_done) {
-		if (cl->ip)
+		if (IP_ISSET(cl->ip))
 			cs_log("radegast: new connection from %s", cs_inet_ntoa(cl->ip));
 		radegast_auth_client(cur_client()->ip);
 		cl->init_done=1;
@@ -231,21 +237,17 @@ static void radegast_server_init(struct s_client *cl) {
 
 void module_radegast(struct s_module *ph)
 {
-  static PTAB ptab; //since there is always only 1 radegast server running, this is threadsafe
-  ptab.ports[0].s_port = cfg.rad_port;
-  ph->ptab = &ptab;
-  ph->ptab->nports = 1;
+  ph->ptab.nports = 1;
+  ph->ptab.ports[0].s_port = cfg.rad_port;
 
   ph->desc="radegast";
   ph->type=MOD_CONN_TCP;
   ph->listenertype = LIS_RADEGAST;
-  ph->multi=0;
-  ph->s_ip=cfg.rad_srvip;
+  IP_ASSIGN(ph->s_ip, cfg.rad_srvip);
   ph->s_handler=radegast_server;
   ph->s_init=radegast_server_init;
   ph->recv=radegast_recv;
   ph->send_dcw=radegast_send_dcw;
-  ph->c_multi=0;
   ph->c_init=radegast_cli_init;
   ph->c_recv_chk=radegast_recv_chk;
   ph->c_send_ecm=radegast_send_ecm;

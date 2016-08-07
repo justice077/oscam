@@ -1,8 +1,12 @@
 //FIXME Not checked on threadsafety yet; after checking please remove this line
 #include "globals.h"
 #ifdef MODULE_CONSTCW
+#include "oscam-client.h"
+#include "oscam-ecm.h"
+#include "oscam-net.h"
+#include "oscam-string.h"
 
-int32_t pserver = 0;
+static int32_t pserver;
 
 int32_t constcw_file_available(void)
 {
@@ -71,14 +75,14 @@ int32_t constcw_client_init(struct s_client *client)
     client->pfd = 0;
     if (socketpair(PF_LOCAL, SOCK_STREAM, 0, fdp))
     {
-	cs_log("Socket creation failed (%s)", strerror(errno));
-	cs_exit(1);
+        cs_log("constcw: Socket creation failed (%s)", strerror(errno));
+        return 1;
     }
     client->udp_fd =fdp[0];
     pserver = fdp[1];
 
     memset((char *) &client->udp_sa, 0, sizeof(client->udp_sa));
-    client->udp_sa.sin_family = AF_INET;
+    SIN_GET_FAMILY(client->udp_sa) = AF_INET;
 
     // Oscam has no reader.au in s_reader like ki's mpcs ;)
     // reader[ridx].au = 0;
@@ -131,10 +135,8 @@ void module_constcw(struct s_module *ph)
   ph->desc = "constcw";
   ph->type = MOD_NO_CONN;
   ph->listenertype = LIS_CONSTCW;
-  ph->multi = 0;
   ph->recv = constcw_recv;
 
-  ph->c_multi = 1;
   ph->c_init = constcw_client_init;
   ph->c_recv_chk = constcw_recv_chk;
   ph->c_send_ecm = constcw_send_ecm;

@@ -23,14 +23,17 @@
 */
 
 #include "../globals.h"
-#ifdef WITH_CARDREADER
-#include "defines.h"
 
+#ifdef WITH_CARDREADER
+#include "../oscam-time.h"
+#include "icc_async.h"
 #include "protocol_t0.h"
-#include "atr.h"
 /*
  * Not exported constants definition
  */
+
+#define OK 0
+#define ERROR 1
 
 #define PROTOCOL_T0_MAX_NULLS          200
 #define PROTOCOL_T0_DEFAULT_WI         10
@@ -69,7 +72,7 @@ static int32_t Protocol_T0_ExchangeTPDU (struct s_reader *reader, unsigned char 
 
 static int32_t APDU_Cmd_Case (unsigned char * command, uint16_t command_len)
 {
-	BYTE B1;
+	unsigned char B1;
 	uint16_t B2B3;
 	uint32_t L;
 	int32_t res;
@@ -144,7 +147,7 @@ int32_t Protocol_T0_Command (struct s_reader * reader, unsigned char * command, 
 
 static int32_t Protocol_T0_Case2E (struct s_reader * reader, unsigned char * command, uint16_t command_len, unsigned char * rsp, uint16_t * lr)
 {
-	BYTE buffer[PROTOCOL_T0_MAX_SHORT_COMMAND];
+	unsigned char buffer[PROTOCOL_T0_MAX_SHORT_COMMAND];
 	unsigned char tpdu_rsp[CTA_RES_LEN];
 	uint16_t tpdu_lr = 0;
 	uint32_t i;
@@ -154,7 +157,7 @@ static int32_t Protocol_T0_Case2E (struct s_reader * reader, unsigned char * com
 	{
 		/* MAP APDU onto command TPDU */
 		memcpy(buffer, command, 4);
-		buffer[4] = (BYTE) Lc;
+		buffer[4] = (unsigned char) Lc;
 		memcpy (buffer + 5, command + 7, buffer[4]);
 		return Protocol_T0_ExchangeTPDU(reader, buffer, buffer[4] + 5, rsp, lr);
 	}
@@ -196,7 +199,7 @@ static int32_t Protocol_T0_Case2E (struct s_reader * reader, unsigned char * com
 static int32_t Protocol_T0_Case3E (struct s_reader * reader, unsigned char * command, unsigned char * rsp, uint16_t * lr)
 {
 	int32_t ret;
-	BYTE buffer[5];
+	unsigned char buffer[5];
 	unsigned char tpdu_rsp[CTA_RES_LEN];
 	uint16_t tpdu_lr = 0;
 	int32_t Lm, Lx;
@@ -206,7 +209,7 @@ static int32_t Protocol_T0_Case3E (struct s_reader * reader, unsigned char * com
 
 	if (Le <= 256)
 	{
-		buffer[4] = (BYTE)Le;
+		buffer[4] = (unsigned char)Le;
 		return Protocol_T0_ExchangeTPDU(reader, buffer, 5, rsp, lr); //this was Case3S !!!
 	}
 
@@ -240,7 +243,7 @@ static int32_t Protocol_T0_Case3E (struct s_reader * reader, unsigned char * com
 		
 		while (Lm > 0)
 		{
-			buffer[4] = (BYTE) MIN (Lm, Lx);
+			buffer[4] = (unsigned char) MIN (Lm, Lx);
 			call (Protocol_T0_ExchangeTPDU(reader, buffer, 5, tpdu_rsp, &tpdu_lr));
 
 			/* Append response TPDU to APDU  */
@@ -264,8 +267,9 @@ static int32_t Protocol_T0_Case3E (struct s_reader * reader, unsigned char * com
 static int32_t Protocol_T0_Case4E (struct s_reader * reader, unsigned char * command, uint16_t command_len, unsigned char * rsp, uint16_t * lr)
 {
 	int32_t ret;
-	BYTE buffer[PROTOCOL_T0_MAX_SHORT_COMMAND];
+	unsigned char buffer[PROTOCOL_T0_MAX_SHORT_COMMAND];
 	unsigned char tpdu_rsp[CTA_RES_LEN];
+	memset(tpdu_rsp, 0, sizeof(tpdu_rsp));
 	uint16_t tpdu_lr = 0;
 	int32_t Le;
 	
@@ -274,7 +278,7 @@ static int32_t Protocol_T0_Case4E (struct s_reader * reader, unsigned char * com
 	if (Lc < 256) {
 		/* Map APDU onto command TPDU */
 		memcpy(buffer,command,4);
-		buffer[4] = (BYTE) Lc;
+		buffer[4] = (unsigned char) Lc;
 		memcpy (buffer + 5, command, buffer[4]);
 		ret = Protocol_T0_ExchangeTPDU(reader, buffer, buffer[4] + 5, tpdu_rsp, &tpdu_lr);
 	}
@@ -285,7 +289,7 @@ static int32_t Protocol_T0_Case4E (struct s_reader * reader, unsigned char * com
 	if (ret == OK)
 	{
 		Le = ((((uint32_t)(command[command_len - 2]) << 8) | command[command_len - 1]) == 0 ? 65536 : (((uint32_t)(command[command_len - 2]) << 8) | command[command_len - 1]));
-		if (tpdu_rsp[tpdu_lr - 2] == 0x61)
+		if (tpdu_lr > 1 && tpdu_rsp[tpdu_lr - 2] == 0x61)
 		{
 			/* Lm == (Le - APDU_Rsp_RawLen (tpdu_rsp)) == 0 */
 			if (tpdu_rsp[tpdu_lr - 1] != 0x00)
@@ -300,11 +304,11 @@ static int32_t Protocol_T0_Case4E (struct s_reader * reader, unsigned char * com
 			buffer[2] = 0x00;
 			buffer[3] = 0x00;
 			buffer[4] = 0x00;     /* B1 = 0x00 */
-			buffer[5] = (BYTE) (Le >> 8);  /* B2 = BL-1 */
-			buffer[6] = (BYTE) (Le & 0x00FF);      /* B3 = BL */
+			buffer[5] = (unsigned char) (Le >> 8);  /* B2 = BL-1 */
+			buffer[6] = (unsigned char) (Le & 0x00FF);      /* B3 = BL */
 			ret = Protocol_T0_Case3E (reader, buffer, rsp, lr);
 		}
-		else if ((tpdu_rsp[tpdu_lr - 2] & 0xF0) == 0x60)
+		else if (tpdu_lr > 1 && (tpdu_rsp[tpdu_lr - 2] & 0xF0) == 0x60)
 		{
 			/* Map response TPDU onto APDU without change */
 			memcpy(rsp, tpdu_rsp, tpdu_lr);
@@ -321,8 +325,8 @@ static int32_t Protocol_T0_Case4E (struct s_reader * reader, unsigned char * com
 			buffer[2] = 0x00;
 			buffer[3] = 0x00;
 			buffer[4] = 0x00;     /* B1 = 0x00 */
-			buffer[5] = (BYTE) Le >> 8;  /* B2 = BL-1 */
-			buffer[6] = (BYTE) Le & 0x00FF;      /* B3 = BL */
+			buffer[5] = (unsigned char) Le >> 8;  /* B2 = BL-1 */
+			buffer[6] = (unsigned char) Le & 0x00FF;      /* B3 = BL */
 			ret = Protocol_T0_Case3E (reader, buffer, rsp, lr);
 		}
 	}
@@ -332,10 +336,11 @@ static int32_t Protocol_T0_Case4E (struct s_reader * reader, unsigned char * com
 
 static int32_t Protocol_T0_ExchangeTPDU (struct s_reader *reader, unsigned char * command, uint16_t command_len, unsigned char * rsp, uint16_t * lr)
 {
-	BYTE buffer[PROTOCOL_T0_MAX_SHORT_RESPONSE];
-	BYTE *data;
-	int32_t Lc, Le, sent, recv;
+	unsigned char buffer[PROTOCOL_T0_MAX_SHORT_RESPONSE];
+	unsigned char *data;
+	int32_t Lc, Le, sent, recved;
 	int32_t nulls, cmd_case;
+	int32_t timeout;
 	*lr = 0; //in case of error this will be returned
 	
 	cmd_case = APDU_Cmd_Case (command, command_len);
@@ -354,12 +359,13 @@ static int32_t Protocol_T0_ExchangeTPDU (struct s_reader *reader, unsigned char 
 			rdr_debug_mask(reader, D_TRACE, "ERROR: invalid cmd_case = %i in Protocol_T0_ExchangeTPDU",cmd_case);
 			return ERROR;
 	}
-	call (ICC_Async_Transmit (reader, 5, command));		//Send header bytes
+	timeout = ICC_Async_GetTimings (reader, reader->char_delay); // we are going to send: char delay timeout
+	if (ICC_Async_Transmit (reader, 5, command, 0, timeout)!=OK) return ERROR;		//Send header bytes
 	
 	/* Initialise counters */
 	nulls = 0;
 	sent = 0;
-	recv = 0;
+	recved = 0;
 	
 	/* 
 	* Let's be a bit paranoid with buffer sizes within this loop
@@ -367,30 +373,34 @@ static int32_t Protocol_T0_ExchangeTPDU (struct s_reader *reader, unsigned char 
 	* if card does not strictly respect the protocol
 	*/
 	
-	while (recv < PROTOCOL_T0_MAX_SHORT_RESPONSE)
+	while (recved < PROTOCOL_T0_MAX_SHORT_RESPONSE)
 	{
-		call (ICC_Async_Receive (reader, 1, buffer + recv));				//Read one procedure byte
+		timeout = ICC_Async_GetTimings (reader, reader->read_timeout); // we are going to receive: WWT timeout
+		if (ICC_Async_Receive (reader, 1, buffer + recved, 0, timeout) != OK) return ERROR;//Read one procedure byte
 		
 		/* NULL byte received */
-		if (buffer[recv] == 0x60) {
+		if (buffer[recved] == 0x60) {
 			nulls++;
 			if (nulls >= PROTOCOL_T0_MAX_NULLS) {								//Maximum number of nulls reached 
 				rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Maximum number of nulls reached: %d", __func__, nulls);
 				return ERROR;
 			}
 		}
-		else if ((buffer[recv] & 0xF0) == 0x60 || (buffer[recv] & 0xF0) == 0x90) /* SW1 byte received */
-		{//printf("sw1\n");
-			recv++;
-			if (recv >= PROTOCOL_T0_MAX_SHORT_RESPONSE) {
-				rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Maximum short response exceeded: %d", __func__, recv);
+		else if ((buffer[recved] & 0xF0) == 0x60 || (buffer[recved] & 0xF0) == 0x90) /* SW1 byte received */
+		{
+			rdr_debug_mask(reader, D_TRACE, "SW1: %02X", buffer[recved]&0xf0);
+			recved++;
+			if (recved >= PROTOCOL_T0_MAX_SHORT_RESPONSE) {
+				rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Maximum short response exceeded: %d", __func__, recved);
 				return ERROR;
 			}
-			call (ICC_Async_Receive (reader, 1, buffer + recv));					//Read SW2 byte
-			recv++;
+			timeout = ICC_Async_GetTimings (reader, reader->read_timeout); // we are going to receive: WWT timeout
+			if (ICC_Async_Receive (reader, 1, buffer + recved, 0, timeout) !=OK) return ERROR; //Read SW2 byte
+			rdr_debug_mask(reader, D_TRACE, "SW2: %02X", buffer[recved]&0xf0);
+			recved++;
 			break;
 		}
-		else if ((buffer[recv] & 0x0E) == (command[1] & 0x0E)) /* ACK byte received */
+		else if ((buffer[recved] & 0x0E) == (command[1] & 0x0E)) /* ACK byte received */
 		{//printf("ack\n");
 			/* Reset null's counter */
 			nulls = 0;
@@ -401,14 +411,15 @@ static int32_t Protocol_T0_ExchangeTPDU (struct s_reader *reader, unsigned char 
 					rdr_debug_mask(reader, D_TRACE, "ERROR: %s: ACK byte: sent=%d exceeds Lc=%d", __func__, sent, Lc);
 					return ERROR;
 				}
-				call (ICC_Async_Transmit(reader, MAX (Lc - sent, 0), data + sent)); /* Send remaining data bytes */
+				timeout = ICC_Async_GetTimings (reader, reader->char_delay); // we are going to send: char delay timeout
+				if(ICC_Async_Transmit(reader, MAX (Lc - sent, 0), data + sent, 0, timeout)!=OK) return ERROR; /* Send remaining data bytes */
 				sent = Lc;
 				continue;
 			}
 			else /* Case 3 command: receive data */
 			{
-				if (recv >= PROTOCOL_T0_MAX_SHORT_RESPONSE) {
-					rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Case 3 ACK - maximum short response exceeded: %d", __func__, recv);
+				if (recved >= PROTOCOL_T0_MAX_SHORT_RESPONSE) {
+					rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Case 3 ACK - maximum short response exceeded: %d", __func__, recved);
 					return ERROR;
 				}
 				
@@ -417,12 +428,13 @@ static int32_t Protocol_T0_ExchangeTPDU (struct s_reader *reader, unsigned char 
 				*/
 				
 				/* Read remaining data bytes */
-				call (ICC_Async_Receive(reader, MAX (Le - recv, 0), buffer + recv));
-				recv = Le;
+				timeout = ICC_Async_GetTimings (reader, reader->read_timeout); // we are going to receive: WWT timeout
+				if (ICC_Async_Receive(reader, MAX (Le - recved, 0), buffer + recved, 0, timeout) != OK) return ERROR;
+				recved = Le;
 				continue;
 			}
 		}
-		else if ((buffer[recv] & 0x0E) == ((~command[1]) & 0x0E)) /* ~ACK byte received */
+		else if ((buffer[recved] & 0x0E) == ((~command[1]) & 0x0E)) /* ~ACK byte received */
 		{//printf("~ack\n");
 			nulls = 0;																								//Reset null's counter
 			
@@ -432,39 +444,41 @@ static int32_t Protocol_T0_ExchangeTPDU (struct s_reader *reader, unsigned char 
 					rdr_debug_mask(reader, D_TRACE, "ERROR: %s: ~ACK byte: sent=%d exceeds Lc=%d", __func__, sent, Lc);
 					return ERROR;
 				}
-				call (ICC_Async_Transmit (reader, 1, data + sent));							//Send next data byte
+				timeout = ICC_Async_GetTimings (reader, reader->char_delay); // we are going to send: char delay timeout
+				if(ICC_Async_Transmit (reader, 1, data + sent, 0, timeout)!=OK) return ERROR;	//Send next data byte
 				sent++;
 				continue;
 			}
 			else {/* Case 3 command: receive data */
-				if (recv >= PROTOCOL_T0_MAX_SHORT_RESPONSE) {
-					rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Case 3 ~ACK - maximum short response exceeded: %d", __func__, recv);
+				if (recved >= PROTOCOL_T0_MAX_SHORT_RESPONSE) {
+					rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Case 3 ~ACK - maximum short response exceeded: %d", __func__, recved);
 					return ERROR;
 				}
-				call (ICC_Async_Receive (reader, 1, buffer + recv));						//Read next data byte
-				recv++;
+				timeout = ICC_Async_GetTimings (reader, reader->read_timeout); // we are going to receive: WWT timeout
+				if(ICC_Async_Receive (reader, 1, buffer + recved, 0, timeout)!=OK) return ERROR;//Read next data byte
+				recved++;
 				continue;
 			}
 		}
 		else { /* Anything else received */
-			rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Received unexpected character: %02X", __func__, buffer[recv]);
+			rdr_debug_mask(reader, D_TRACE, "ERROR: %s: Received unexpected character: %02X", __func__, buffer[recved]);
 			return ERROR;
 		}
 	}//while
 		
-	memcpy(rsp, buffer, recv);
-	*lr = recv;
+	memcpy(rsp, buffer, recved);
+	*lr = recved;
 	return OK;
 }
 
 int32_t Protocol_T14_ExchangeTPDU (struct s_reader *reader, unsigned char * cmd_raw, uint16_t command_len, unsigned char * rsp, uint16_t * lr)
 {
-	BYTE buffer[PROTOCOL_T14_MAX_SHORT_RESPONSE];
-	int32_t recv;
+	unsigned char buffer[PROTOCOL_T14_MAX_SHORT_RESPONSE];
+	int32_t recved;
 	int32_t cmd_case;
-	BYTE ixor = 0x3E;
-	BYTE ixor1 = 0x3F;
-	BYTE b1 = 0x01;
+	int32_t timeout;
+	unsigned char ixor = 0x3E;
+	unsigned char ixor1 = 0x3F;
 	int32_t i;
 	int32_t cmd_len = (int32_t) command_len;
 	*lr = 0; //in case of error this is returned
@@ -480,35 +494,32 @@ int32_t Protocol_T14_ExchangeTPDU (struct s_reader *reader, unsigned char * cmd_
 		return ERROR;
 	}
 	
-	if (reader->typ <= R_MOUSE) {
-		call (ICC_Async_Transmit (reader, 1, &b1));						//send 0x01 byte
-		call (ICC_Async_Transmit (reader, cmd_len, cmd_raw));	//send apdu
-		call (ICC_Async_Transmit (reader, 1, &ixor));					//Send xor byte
-	}
-	else {
-		buffer[0] = 0x01;
-		memcpy(buffer+1, cmd_raw, cmd_len);
-		buffer[cmd_len+1] = ixor;
+	buffer[0] = 0x01; //send 0x01 byte
+	memcpy(buffer+1, cmd_raw, cmd_len); // apdu
+	buffer[cmd_len+1] = ixor; // xor byte
 		
-		/* Send apdu */
-		call (ICC_Async_Transmit (reader, cmd_len+2, buffer));//send apdu
-	}
+	/* Send apdu */
+	timeout = ICC_Async_GetTimings (reader, reader->char_delay); // we are going to send: char delay timeout
+	if(ICC_Async_Transmit (reader, cmd_len+2, buffer, 0, timeout)!=OK) return ERROR;//send apdu
+	if(cmd_raw[0] == 0x02 && cmd_raw[1] == 0x09) cs_sleepms(2500); //FIXME why wait? -> needed for init on overclocked T14 cards
 	
-	if(cmd_raw[0] == 0x02 && cmd_raw[1] == 0x09)
-		cs_sleepms(2500); //FIXME why wait?
-	call (ICC_Async_Receive (reader, 8, buffer));				//Read one procedure byte
-	recv = (int32_t)buffer[7];
-	if(recv)
-		call (ICC_Async_Receive (reader, recv, buffer + 8));
-	call (ICC_Async_Receive (reader, 1, &ixor));
-	for(i=0; i<8+recv; i++)		
+	timeout = ICC_Async_GetTimings (reader, reader->read_timeout); // we are going to receive: WWT timeout
+	if(ICC_Async_Receive (reader, 8, buffer, 0, timeout)!=OK) return ERROR;	//Read one procedure byte
+	recved = (int32_t)buffer[7];
+	if(recved){
+		timeout = ICC_Async_GetTimings (reader, reader->read_timeout); // we are going to receive: WWT timeout
+		if (ICC_Async_Receive (reader, recved, buffer + 8, 0 , timeout)!=OK) return ERROR;
+	}
+	timeout = ICC_Async_GetTimings (reader, reader->read_timeout); // we are going to receive: WWT timeout
+	if(ICC_Async_Receive (reader, 1, &ixor, 0, timeout)!=OK) return ERROR;
+	for(i=0; i<8+recved; i++)		
 		ixor1^=buffer[i];
 	if(ixor1 != ixor) {
 		rdr_debug_mask(reader, D_TRACE, "ERROR: invalid checksum = %02X expected %02X", ixor1, ixor);
 		return ERROR;
 	}
-	memcpy(buffer + 8 + recv, buffer + 2, 2);
-	*lr = recv + 2;
+	memcpy(buffer + 8 + recved, buffer + 2, 2);
+	*lr = recved + 2;
 	memcpy(rsp, buffer + 8, *lr); 
 	return OK;
 }
