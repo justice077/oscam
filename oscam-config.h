@@ -36,7 +36,7 @@
 #endif
 
 #ifndef LCDSUPPORT
-//#define LCDSUPPORT
+#define LCDSUPPORT
 #endif
 
 #ifndef IPV6SUPPORT
