@@ -150,10 +150,10 @@
 #ifndef READER_BULCRYPT
 #define READER_BULCRYPT
 #endif
-#endif
 
 #ifndef CS_CACHEEX
 #define CS_CACHEEX
+#endif
 #endif
 
 #endif //OSCAM_CONFIG_H_
