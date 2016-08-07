@@ -47,6 +47,11 @@ if (CMAKE_CROSSCOMPILING)
         set (OSCamOperatingSystem "Padre")
     elseif (OSCAM_SYSTEM_NAME MATCHES "FriendlyARM")
         set (OSCamOperatingSystem "FriendlyARM")
+    elseif (${CYGWIN})
+        set (OSCamOperatingSystem "Windows/Cygwin")
+        set (CS_OS_HW "pc")
+        set (CS_OS_SYS "cygwin")
+        set (CMAKE_SYSTEM_PROCESSOR "i386")
     else (OSCAM_SYSTEM_NAME MATCHES "Tuxbox")
         message (STATUS "Unknown cross system name: <${CMAKE_SYSTEM_NAME}>")
         set (OSCamOperatingSystem "Unknown")
@@ -83,6 +88,7 @@ include_directories (
     ${CMAKE_CURRENT_SOURCE_DIR}/cygwin
     /usr/include/w32api
     ${OPTIONAL_INCLUDE_DIR}
+    ${OPTIONAL_INCLUDE_DIR}/w32api
     )
 else (OSCamOperatingSystem MATCHES "Windows/Cygwin")
 include_directories (
@@ -191,7 +197,12 @@ elseif (HAVE_PTHREAD)
     message(STATUS "  no pthread found. No smartreader ")
 endif (HAVE_PTHREAD)
 
+if  (${CS_OSTYPE} MATCHES "powerpc-tuxbox")
+elseif (${CS_OSTYPE} MATCHES "i686-pc-linux")
+else (${CS_OSTYPE} MATCHES "powerpc-tuxbox")
 check_include_file ("openssl/aes.h" HAVE_LIBCRYPTO)
+endif  (${CS_OSTYPE} MATCHES "powerpc-tuxbox")
+
 if (HAVE_LIBCRYPTO)
     add_definitions ("-DWITH_LIBCRYPTO")
 endif (HAVE_LIBCRYPTO)
@@ -214,7 +225,7 @@ endif (OPENSSL_FOUND)
 
 if (NOT OSCamOperatingSystem MATCHES "Mac OS X")
    if (LIBRTDIR)
-        check_include_file ("${LIBRTDIR}/include/time.h" HAVE_LIBRT_STATIC)
+        check_include_file ("${LIBRTDIR}/include/sys/time.h" HAVE_LIBRT_STATIC)
         if (HAVE_LIBRT_STATIC)
             if (EXISTS ${LIBRTDIR}/lib/librt.a)
                 message(STATUS "  static librt found : ${LIBRTDIR}/lib/librt.a (needed by libusb).")
@@ -251,7 +262,6 @@ if (NOT OSCamOperatingSystem MATCHES "Mac OS X")
 else (NOT OSCamOperatingSystem MATCHES "Mac OS X")
     set (HAVE_LIBRT True)
 endif (NOT OSCamOperatingSystem MATCHES "Mac OS X")
-
 
 if( HAVE_LIBRT OR HAVE_LIBRT_STATIC)
     if (LIBUSBDIR)
@@ -299,6 +309,9 @@ if( HAVE_LIBRT OR HAVE_LIBRT_STATIC)
 endif( HAVE_LIBRT OR HAVE_LIBRT_STATIC)
 
 check_include_file ("PCSC/wintypes.h" HAVE_PCSC)
+if ((NOT HAVE_PCSC) AND OPTIONAL_INCLUDE_DIR)
+	check_include_file("${OPTIONAL_INCLUDE_DIR}/PCSC/wintypes.h" HAVE_PCSC)
+endif((NOT HAVE_PCSC) AND OPTIONAL_INCLUDE_DIR)
 if (HAVE_PCSC)
 		if(OPTIONAL_INCLUDE_DIR AND EXISTS ${OPTIONAL_INCLUDE_DIR}/PCSC/wintypes.h)
 	    message(STATUS "  PCSC headers found (${OPTIONAL_INCLUDE_DIR}/PCSC). Adding PCSC support ")
@@ -447,7 +460,7 @@ elseif (OSCamOperatingSystem MATCHES "Amino")
 elseif (OSCamOperatingSystem MATCHES "QboxHD")
 elseif (OSCamOperatingSystem MATCHES "Windows/Cygwin")
     message (STATUS "Windows system PCSC : winscard.dll")
-    target_link_libraries (${exe_name} winscard)
+    target_link_libraries (${exe_name} -Wl,--enable-stdcall-fixup winscard)
     target_link_libraries (${exe_name} setupapi )
     target_link_libraries (${exe_name} ole32)
     target_link_libraries (${exe_name} shell32)
@@ -470,12 +483,12 @@ add_dependencies (${csoscam} svnversion-log)
 add_custom_target (
     svnversion
     ALL
-    touch ${CMAKE_CURRENT_SOURCE_DIR}/oscam.c
+#   touch ${CMAKE_CURRENT_SOURCE_DIR}/oscam.c
 )
 add_custom_target (
     svnversion-log
     ALL
-    touch ${CMAKE_CURRENT_SOURCE_DIR}/oscam-log.c
+#   touch ${CMAKE_CURRENT_SOURCE_DIR}/oscam-log.c
 )
 
 execute_process (COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/config.sh --oscam-revision COMMAND tr -d '\n' OUTPUT_VARIABLE CS_SVN_VERSION)

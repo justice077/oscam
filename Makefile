@@ -285,6 +285,26 @@ CSCTAPI_OBJ = $(CSCTAPI_OBJ-y)
 ifeq "$(CSCTAPI_OBJ)" ""
 CSCTAPI_LIB =
 endif
+######################################################################
+#
+#	Cygwin crosscompiler with PCSC
+#
+######################################################################
+cross-i386-pc-cygwin-pcsc:
+	@-$(MAKE) --no-print-directory \
+		-f Maketype TYP=$(subst cross-,,$@) \
+		OS_LIBS="-lcrypto -lm -lwinscard" \
+		OS_CULI="-lncurses" \
+		OS_PTLI="-lpthread" \
+		DS_OPTS="-O2 -DOS_CYGWIN32 -DWITH_LIBCRYPTO -D_WIN32 -DCS_CONFDIR=${CS_CONFDIR} -static -DHAVE_PCSC=1 -D'CS_SVN_VERSION="\"$(SVN_REV)\""'" \
+		DS_CFLAGS="-c" \
+		DS_LDFLAGS="" \
+		DS_ARFLAGS="-rvsl" \
+		DS_CC=i686-pc-cygwin-gcc \
+		DS_AR=i686-pc-cygwin-ar \
+		DS_LD=i686-pc-cygwin-ld \
+		DS_RL=i686-pc-cygwin-ranlib \
+		DS_ST=i686-pc-cygwin-strip
 
 OSCAM_LIB = $(LIBDIR)/libcs-$(TARGET).a
 OSCAM_DEP = $(GLOBAL_DEP) globals.h oscam-config.h
