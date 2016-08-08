@@ -1,11 +1,15 @@
 ##TPLHEADER##
 ##TPLMENU##
 ##TPLFILEMENU##
+<SCRIPT type="text/javascript">function gotosite(){var URL = document.gotoform.url_list.options[document.gotoform.url_list.selectedIndex].value; window.location.href = URL;}</SCRIPT>
+<P ID="filename">##APIFILENAME##</P>
 ##TPLMESSAGE##
-	<DIV CLASS="debugmenu">##SDEBUG##</DIV>	<DIV CLASS="logmenu">##LOGMENU##</DIV>	<DIV CLASS="filterform">##FILTERFORM##</DIV>	<FORM ACTION="files.html" method="post">
-		<INPUT TYPE="hidden" NAME="file" VALUE="##PART##">
-		<TEXTAREA NAME="filecontent" CLASS="editor" rows="50" cols="200">##FILECONTENT##</TEXTAREA>
-		<BR>##WRITEPROTECTION##<BR>
-		<INPUT TYPE="submit" NAME="action" VALUE="Save" TITLE="Save file" ##BTNDISABLED##>
-	</FORM>
+##SDEBUG##
+	<DIV CLASS="logmenu">##LOGMENU##</DIV>
+	<DIV CLASS="filterform">##FILTERFORM##</DIV>
+	<form action="files.html" method="post">
+		<input type="hidden" name="file" value="##PART##">
+		<textarea name="filecontent" class="editor">##FILECONTENT##</textarea>		
+		<P ID="filesubmit">##WRITEPROTECTION##<input type="submit" name="action" value="Save" title="Save file" ##BTNDISABLED##></P>
+	</form>
 ##TPLFOOTER##

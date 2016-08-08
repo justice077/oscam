@@ -26,6 +26,21 @@ logging targets, default:/var/log/oscam.log. You can define a maximum of one fil
 additionally to log to stdout or syslog (you can also only log to stdout or syslog and omit 
 the filename).
 .RE
+PP
+\fBinitial_debuglevel\fP = \fBlevel\fP
+.RS 3n
+set initial debug level for OSCam start, default:0
+.RE
+PP
+\fBsysloghost\fP = \fBhostname\fP
+.RS 3n
+set remote syslog host, default:none
+.RE
+.PP
+\fBsyslogport\fP = \fBport\fP
+.RS 3n
+set TCP/IP port for remote syslog host, default:none
+.RE
 .PP
 \fBecmfmt\fP = \fBformat\fP
 .RS 3n
@@ -34,14 +49,18 @@ define ECM log format, default:c&p/i/s/l:h
 possible variables:
 
   \fBc\fP = CAID
-  \fBp\fP = provider ID
-  \fBi\fP = Channel ID
   \fBd\fP = PID
-  \fBs\fP = service ID
-  \fBl\fP = length
-  \fBh\fP = checksum
   \fBe\fP = CSP hash
+  \fBg\fP = ID of origin gbox peer
+  \fBh\fP = checksum
+  \fBi\fP = channel ID
+  \fBj\fP = distance of gbox hops
+  \fBl\fP = length
+  \fBo\fP = ONID
+  \fBp\fP = provider ID
+  \fBs\fP = service ID
   \fBw\fP = CW
+  \fBy\fP = payload
 
 use a value as prefix to hide variable with this value, control characters will be escaped by "\\"
 
@@ -127,7 +146,6 @@ define file saving NDS Videoguard mail messages from provider, default:none
 .PP
 \fBenableled\fP = \fB0\fP|\fB1\fP|\fB2\fP
 .RS 3n
-
  \fB0\fP = LED support disabled (default)
  \fB1\fP = LED support enabled for routers
  \fB2\fP = LED support enabled for Qbox HD
@@ -145,7 +163,11 @@ additional delay in milli-seconds after waiting for local SCs on startup before 
 .PP
 \fBpreferlocalcards\fP = \fB0\fP|\fB1\fP
 .RS 3n
-1 = try decoding on local cards first, default:0
+SC decoding behavior: 
+
+ \fB0\fP = local SCs used like a remote reader
+ \fB1\fP = prefer cache exchange based SCs (default)
+ \fB2\fP = prefer local SCs
 .RE
 .PP
 \fBreaderrestartseconds\fP = \fBseconds\fP
@@ -185,6 +207,11 @@ per user in \fBoscam.user\fP, default:0
 time falling back to fallback reader, default:2500
 .RE
 .PP
+\fBfallbacktimeout_percaid\fP = \fBmilli-seconds\fP
+.RS 3n
+time falling back to CAID restricted fallback reader, default:2500
+.RE
+.PP
 \fBsleep\fP = \fBminutes\fP
 .RS 3n
 time waiting for inactive users, default:none, can be overwritten per user in \fBoscam.user\fR
@@ -192,7 +219,7 @@ time waiting for inactive users, default:none, can be overwritten per user in \f
 .PP
 \fBserverip\fP = \fBIP address\fP
 .RS 3n
-bind service to specified IP address, default:all
+bind service to specified IP address, default:none
 .RE
 .PP
 \fBbindwait\fP = \fBseconds\fP
@@ -245,6 +272,10 @@ mode for duplicate client connections (requirement: uniq > 0):
 .RS 3n
 ECM will be send to two or more readers with the same SC and the CWs will be verified against each other for defined CAID or first two bytes of CAID, \fBlb_nbest_readers\fP must be set to 2 or higher, default:none
 .RE
+\fBgetblockemmauprovid\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = server overrides EMM blocking defined on client site, default:0
+.RE
 .PP
 \fBlb_mode\fP = \fBmode\fP
 .RS 3n
@@ -280,14 +311,6 @@ set count of best readers for load balancing, default:1
 set count of fallback readers for load balancing, default:1
 .RE
 .PP
-\fBlb_reopen_mode\fP = \fB0\fP|\fB1\fP
-.RS 3n
-load balancing reopen readers mode:
-
- \fB0\fP = standard late reopening of blocker readers (default)
- \fB1\fP = fast reopening of blocker readers
-.RE
-.PP
 \fBlb_nbest_percaid\fP = \fBCAID1:count1[,CAID2:count2]...\fP
 .RS 3n
 set count of best readers per CAIDs for load balancing, wildcard CAIDs with two-digit CAIDs possible, default:none
@@ -311,9 +334,19 @@ maximum ECM count before resetting load balancing values, default:500
 time between retrying failed load balanced readers/CAIDs/providers/services, default:900
 .RE
 .PP
+\fBlb_reopen_invalid\fP = \fB0\fP|\fBfB1\fP
+.RS 3n
+0 = E_INVALID will be blocked until statistics has been cleaned, default:1
+.RE
+.PP
+\fBlb_force_reopen_always\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = force reopening immediately all failing readers if no matching reader was found, default:0
+.RE
+.PP
 \fBlb_retrylimit\fP = \fBmilli-seconds\fP
 .RS 3n
-retry next load balanced reader only if response time is higher then lb_retrylimit, default:800
+retry next load balanced reader only if response time is higher then lb_retrylimit, default:0
 .RE
 .PP
 \fBlb_savepath\fP = \fBfilename\fP
@@ -427,7 +460,7 @@ monitor level:
  \fB3\fP = all procs, reload of \fBoscam.user\fR possible
  \fB4\fP = complete access
 
-monlevel can be overwritten per user in \fBoscam.user\fR
+monlevel can be overwritten per user in \fBoscam.user\fR.
 .RE
 .PP
 \fBhideclient_to\fP = \fBseconds\fP
@@ -507,6 +540,22 @@ status refresh in seconds, default:none
 1 = enables hiding clients after idle time set in parameter \fBhideclient_to\fP, default:0
 .RE
 .PP
+\fBhttphidetype\fP = \fBtype\fP[\fBtype\fP]...
+.RS 3n
+characters defining columns to hide in web interface status page (see type 
+column), default:none
+
+ types:
+
+ 'c': client
+ 'h': http
+ 'm': monitor
+ 'p': proxy
+ 'r': reader
+ 's': server
+ 'x': cache exchange
+.RE
+.PP
 \fBhttpscript\fP = \fBpath\fP
 .RS 3n
 path to an executable script which you wish to start from web interface, default:none
@@ -514,13 +563,15 @@ path to an executable script which you wish to start from web interface, default
 .PP
 \fBhttpallowed\fP = \fBIP address\fP|\fBIP address range\fP[,\fBIP address\fP|\fBIP address range]\fP...
 .RS 3n
-http web interface connections allowed, default:none
+http web interface connections allowed, default:127.0.0.1,192.168.0.0-192.168.255.255,10.0.0.0-10.255.255.255,::1
+ 
  example: httpallowed = 127.0.0.1,192.168.0.0-192.168.255.255
 .RE
 .PP
 \fBhttpdyndns\fP = \fBhostname[,hostname][,hostname]\fP
 .RS 3n
 http web interface connections allowed, default:none
+ 
  example: httpdyndns = host.example.com
           httpdyndns = host1.example.com,host2.example.com
 .RE
@@ -535,6 +586,11 @@ write config:
  \fB1\fP = all parameters
 .RE
 .PP
+\fBhttpoverwritebakfile\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = overwrite backup configuration files, default:0
+.RE
+.PP
 \fBhttpreadonly\fP = \fB0\fP|\fB1\fP
 .RS 3n
 1 = read only modus for web interface, default:0
@@ -545,11 +601,26 @@ write config:
 1 = show picons in user list, default:0
 .RE
 .PP
+\fBhttppiconpath\fP = \fBpath\fP
+.RS 3n
+path to picons, default:none
+.RE
+.PP
 \fBhttphelplang\fP = \fBen\fP|\fBde\fP|\fBfr\fP|\fB<available wiki languages>\fP
 .RS 3n
 set right language for wiki entry point, default:en
 .RE
+.PP
+\fBhttplocale\fP = \fBenvironment\fP
+.RS 3n
+set the locale environment, default:none
+.RE
 .SS "The [lcd] section"
+.RE
+.PP
+\fBhttposcamlabel\fP = \fBtext\fP
+.RS 3n
+set individual label in web interface header, default:OSCam
 .RE
 .PP
 \fBenablelcd\fP = \fB0\fP|\fB1\fP
@@ -580,15 +651,15 @@ value to delay cached requests, default:0
 .PP
 \fBmax_time\fP = \fBseconds\fP
 .RS 3n
-maximum time CWs resist in cache after 1st client request, the time must be 2 seconds highter than the parameter \fBclienttimeout\fP, default:15
+maximum time CWs resist in cache, the time must be 2 seconds highter than the parameter \fBclienttimeout\fP, default:15
 .RE
 .PP
-\fBmax_count\fP = \fBcount\fP
+\fBmax_hit_time\fP = \fBseconds\fP
 .RS 3n
-maximum CWs in cache, default:1000
+maximum time for cache exchange hits resist in cache for evaluating \fBwait_time\fP, default:15
 .RE
 .PP
-\fBwait_time\fP = \fB[caid][&mask][@provid][$servid][:awtime][:]dwtime,n\fP
+\fBwait_time\fP = \fB[caid][&mask][@provid][$servid][:awtime][:]dwtime[,[caid][&mask][@provid][$servid][:awtime][:]dwtime]...\fP
 .RS 3n
 wait time in milli-seconds for cache exchange and Cardservproxy before sending ECMs to reader or proxy, default:none
 
@@ -602,17 +673,36 @@ wait time in milli-seconds for cache exchange and Cardservproxy before sending E
 \fIPlease consider memory consumption.\fR
 .RE
 .PP
+\fBcacheex_cw_check\fP = \fB[caid][&mask][@provid][$servid]:mode:counter[,[caid][&mask][@provid][$servid]:mode:counter]...\fP
+.RS 3n
+
+ \fBmode\fP = specify behaviour for counter:
+              
+        \fB0\fP = when \fBwait_time\fP expires, serve highest counter's CW 
+            got anyway, even if no counter reached (default)
+        \fB1\fP = never serve CW from cache exchange stored in cache, 
+            if it's counter not reaches counter. When \fBwait_time\fP 
+            expires, requests will go to normal readers
+ 
+ \fBcounter\fP = set minimum CW counter to allow CW is used, default:1
+.RE
+.PP
+\fBcacheex_mode1_delay\fP = \fBCAID1:time,[BCAID2:time]...\fP
+.RS 3n
+delay in milli-seconds for asking cache exchange mode 1 readers, default:none
+.RE
+.PP
 \fBcsp_port\fP = \fBport\fP
 .RS 3n
-TCP port of Cardservproxy for cache exchange, default:none
+UDP port of Cardservproxy for cache exchange, default:none
 .RE
 .PP
 \fBcsp_serverip\fP = \fBIP\fP
 .RS 3n
-IP address of Cardservproxy for cache exchange, default:none
+bind Cardservproxy for cache exchange to specified IP address, default:none
 .RE
 .PP
-\fBcsp_ecm_filter\fP = \fB[caid][&mask][@provid][$servid],n\fP
+\fBcsp_ecm_filter\fP = \fB[caid][&mask][@provid][$servid][,[caid][&mask][@provid][$servid]]...\fP
 .RS 3n
 Cardservproxy incoming ECM filter setting, default:none
 .RE
@@ -620,6 +710,11 @@ Cardservproxy incoming ECM filter setting, default:none
 \fBcsp_allow_request\fP = \fB0\fP|\fB1\fP
 .RS 3n
 allow incoming ECM request from Cardservproxy, default:1
+.RE
+.PP
+\fBcsp_allow_reforward\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = reforward other cacheex updates to Cardservproxy peers, \fIoption could cause loops\fR, default:0
 .RE
 .PP
 \fBcwcycle_check_enable\fP = \fB0\fP|\fB1\fP
@@ -639,27 +734,45 @@ maximum CW cycle list entries, default:500, maximum:4000
 .PP
 \fBcwcycle_keeptime\fP = \fBminutes\fP
 .RS 3n
-minimum time a learned cycle time resists in memory, default:0, maximum:15
+minimum time a learned cycle time resists in memory, default:15, maximum:15
 .RE
 .PP
 \fBcwcycle_onbad\fP = \fB0\fP|\fB1\fP
 .RS 3n
-0 = log bad CW cycle only, 1 = drop bad CW cycle, default:0
+0 = log bad CW cycle only, 1 = drop bad CW cycle, default:1
 .RE
 .PP
 \fBcwcycle_dropold\fP = \fB0\fP|\fB1\fP
 .RS 3n
-1= drop old CW cycle, default:0
+1= drop old CW cycle, default:1
 .RE
 .PP
 \fBcwcycle_sensitive\fP = \fB0\fP|\fB2\fP|\fB3\fP|\fB4\fP
 .RS 3n
 drop CW mode:
 
- \fB0\fP = disabled (default)
+ \fB0\fP = disabled
  \fB2\fP = 2 (or more) same bytes and drop new CW
  \fB3\fP = 3 (or more) same bytes and drop new CW
- \fB4\fP = 4 (or more) same bytes and drop new CW
+ \fB4\fP = 4 (or more) same bytes and drop new CW (default)
+.RE
+.PP
+\fBcwcycle_allowbadfromffb\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = allow bad cycles from a fixed fallback reader, default:0
+.RE
+.PP
+\fBcwcycle_usecwcfromce\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = use CW info from cache exchange, default:0
+.RE
+.PP
+\fBwait_until_ctimeout\fP = \fB0\fP|\fB1\fP
+.RS 3n
+answer when cache exchange timeout expires, if no normal readers are available for sending ECMs:
+
+ \fB0\fP = immediately send 'not found' to client (default)
+ \fB1\fP = wait for cache exchange answer until client timeout expires
 .RE
 .SS "The [camd33] section"
 \fBport\fP = \fB0\fP|\fBport\fP
@@ -721,6 +834,11 @@ TCP port/CAID/provid definitions for camd 3.78x clients, 0 = disabled, default:0
 bind service to specified IP address, default:all
 .RE
 .PP
+\fBkeepalive\fP = \fB0\fP|\fB1\fP
+.RS 3n
+0 = disable camd 3.78x keepalive modus, default:0
+.RE
+.PP
 \fBsuppresscmd08\fP = \fB0\fP|\fB1\fP
 .RS 3n
 0 = tell camd 3.78x clients not to request again for rejected CAID, service ID and provider ID combination, 1 = disable, can be overwritten per user in \fBoscam.user\fP, default:0
@@ -752,7 +870,7 @@ bind newcamd service to specified IP address, default:all
 .RS 3n
 newcamd client connections allowed from, default:none
 
- example: allowed = 127.0.0.1,192.168.0.0-192.168.255.255
+ example: allowed = 127.0.0.1,192.168.0.0-192.168.255.255,::1
 .RE
 .PP
 \fBkeepalive\fP = \fB0\fP|\fB1\fP
@@ -795,17 +913,21 @@ user name for radegast client
 
 parameters:
  \fBuser\fP   = \fBaccount\fP
- \fBdevice\fP = \fBserial device name\fP
+ \fBdevice\fP = \fBserial device name\fP|\fBhostname|IP\fP,\fBport\fP
+ \fBbaud\fP   = \fBserial port speed\fP (for serial devices only)
  \fBoption\fP = \fBtimeout\fP = milli-seconds, timeout for connection, 
                     default:50
           \fBdelay\fP   = milli-seconds, additional delay between two
                     characters, default:0
 
-supported serial devices:
+supported serial devices (autodection):
  HSIC    (humax sharing interface client)
  SSSP    (simple serial sharing protocol)
  bomba   (BOMBA firmware)
  dsr9500 (DSR 9500)
+ 
+ example: user1@/dev/ttyS1:115200?delay=1&timeout=5000
+          user2@192.160.0.1,12345?delay=1&timeout=5000
 .RE
 .SS "The [cccam] section"
 .PP
@@ -825,9 +947,9 @@ define CCcam version, \fIminimum CCcam version 2.0.11\fR, used with original CCc
 .RS 3n
 reshare level for CCcam clients (default:10):
 
- \fB0\fP = no resharing
- \fB1\fP = resharing for direct peer only
- \fB2\fP = resharing for direct peer and next level
+\fB-1\fP = no resharing
+ \fB0\fP = resharing for direct peer only
+ \fB1\fP = resharing for direct peer and next level
  \fBx\fP = resharing for direct peer and next x level
 .RE
 .PP
@@ -836,11 +958,11 @@ reshare level for CCcam clients (default:10):
 CCcam reshare mode:
 
  \fB0\fP = reader reshares only received SCs for CCcam readers, 
-     defined filters/CAIDs/provids on other readers (default)
+     defined filters/CAIDs/provids on other readers
  \fB1\fP = reader reshares received SCs (like=0) and defined services
  \fB2\fP = reader reshares only defined reader services as virtual SCs
  \fB3\fP = reader reshares only defined user services as virtual SCs
- \fB4\fP = reader reshares only received SCs
+ \fB4\fP = reader reshares only received SCs (default)
 
 Every server is shared as hop = 0 and with defined reshare values.
 
@@ -915,9 +1037,39 @@ set CCcam node ID in hex, default:none
 .RE
 .SS "The [gbox] section"
 .PP
-\fBgbox_hostname\fP = \fBhostname\fP| \fBIP address\fP
+\fBhostname\fP = \fBhostname\fP| \fBIP address\fP
 .RS 3n
 set hostname or IP address for gbox protocol, default:none
+.RE
+.PP
+\fBport\fP = \fBport\fP[,\fBport\fP]...
+.RS 3n
+UDP port for gbox server, default:0
+.RE
+.PP
+\fBmy_password\fP = \fBpassword\fP
+.RS 3n
+password for connection to local gbox peer, default:none
+.RE
+.PP
+\fBproxy_card\fP = \fB<CAID><provid>[,<CAID><provid>]...\fP
+.RS 3n
+proxy reader SCs to be reshared into gbox network, default:none
+.RE
+.PP
+\fBccc_reshare\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = enable CCCam reshare, default:0
+.RE
+.PP
+\fBmy_vers\fP = \fBversion\fP
+.RS 3n
+set gbox version in hexadecimal low byte, default:25
+.RE
+.PP
+\fBmy_cpu_api\fP = \fBbyte\fP
+.RS 3n
+set gbox CPU and API byte in hexadecimal, default:40
 .RE
 .PP
 \fBgbox_reconnect\fP = \fBtime\fP
@@ -925,9 +1077,25 @@ set hostname or IP address for gbox protocol, default:none
 send message to peers in seconds, default:300
 .RE
 .PP
-\fBgbox_local_cards\fP = \fB<local card 1>\fP[,\fB<local card 2>\fP]...
+\fBgsms_disable\fP = \fB0\fP|\fB1\fP
 .RS 3n
-list of local cards presented to peers, (maximum see CS_GBOX_MAX_LOCAL_CARDS in globals.h), default:none
+1 = disable gbox short message service (GSMS),default:0
+
+sending a messeage: /tmp/gsms.txt: <box ID> <1=mormal message|2=OSD/TV message> 
+<message 6 to 127 characters>, status will be stored in '/tmp/gsms.ack' 
+respective 'gsms.nack', receiving a message: The message will be stored in 
+/tmp/gsms.log 
+.RE
+.PP
+\fBtmp_dir\fP = \fBpath\fP
+.RS 3n
+temporary directory for gbox, default:/tmp/.oscam
+.RE
+.SS "The [scam] section"
+.PP
+\fBport\fP = \fBport\fP
+.RS 3n
+UDP port for scam server, default:0
 .RE
 .SS "The [dvbapi] section"
 .PP
@@ -936,6 +1104,11 @@ list of local cards presented to peers, (maximum see CS_GBOX_MAX_LOCAL_CARDS in 
 1 = DVB API enabled, default:0
 
 Create file /tmp/.pauseoscam to pause DVB API, e.g. if STB goes into standby and OSCam remains as SC server only.
+.RE
+.PP
+\fBlisten_port\fP = \fB0\fP|\fBport\fP
+.RS 3n
+TCP/IP port for SAT IP clients, filtering has to be done on client site, 0 = disabled, default:0
 .RE
 .PP
 \fBuser\fP = \fBusername\fP
@@ -979,6 +1152,18 @@ PMT mode:
      disable camd.socket
 .RE
 .PP
+\fBecminfo_type\fP = \fB0\fP|\fB1\fP|\fB2\fP|\fB3\fP|\fB4\fP|\fB5\fP
+.RS 3n
+ecm.info types:
+
+ \fB0\fP = OSCam syntax (default)
+ \fB1\fP = OSCam syntax with ECM time in ms instead of seconds
+ \fB2\fP = WiCardd
+ \fB3\fP = mgcamd
+ \fB4\fP = CCcam
+ \fB5\fP = camd3
+.RE
+.PP
 \fBrequest_mode\fP = \fB0\fP|\fB1\fP
 .RS 3n
 CAID request mode:
@@ -987,7 +1172,7 @@ CAID request mode:
  \fB1\fP = try all CAIDs simultaneously
 .RE
 .PP
-\fBboxtype\fP = \fBdbox2\fP|\fBdreambox\fP|\fBdm7000\fP|\fBduckbox\fP|\fBufs910\fP|\fBipbox\fP|\fBipbox-pmt\fP|\fBqboxhd\fP|\fBcoolstream\fP|\fBneumo\fP|\fBpc\fP
+\fBboxtype\fP = \fBdbox2\fP|\fBdreambox\fP|\fBdm7000\fP|\fBduckbox\fP|\fBufs910\fP|\fBipbox\fP|\fBipbox-pmt\fP|\fBqboxhd\fP|\fBcoolstream\fP|\fBneumo\fP|\fBsamygo\fP|\fBpc\fP
 .RS 3n
 set boxtype, auto detection of DVB API will be aspired, default:dreambox
 
@@ -998,6 +1183,23 @@ ipbox-pmt can be used on any DGS based images (with or without camd.socket suppo
 verified on HD models only
 
 pc is for generic pc support (currently supported on VDR with vdr-plugin-dvbapi)
+.RE
+.PP
+\fBread_sdt\fP = \fB0\fP|\fB1\fP|\fB2\fP
+.RS 3n
+mode of provider, channel name and service type auto detection via SDT:
+
+ \fB0\fP = disabled (default)
+ \fB1\fP = enabled for non FTA channels only
+ \fB2\fP = enabled for all channels
+.RE
+.PP
+\fBwrite_sdt_prov\fP = \fB0\fP|\fB1\fP
+.RS 3n
+mode writing provider name into \fBoscam.srvid2\fR file:
+
+ \fB0\fP = disabled (default)
+ \fB1\fP = enabled
 .RE
 .PP
 \fBcw_delay\fP = \fBmilli-seconds\fP
@@ -1014,16 +1216,11 @@ minimum time to write CW, default:0
 .RS 3n
 1 = reopen demux devices on each channel switching, default:0
 .RE
-.PP
-\fBdecodeforever\fP =  \fB0\fP|\fB1\fP
-.RS 3n
-1 = trying to decode on all CAIDs infinitely, default:0
-.RE
 .SS "The [anticasc] section"
 .PP
 \fBenabled\fP = \fB0\fP|\fB1\fP
 .RS 3n
-1 = enabled anti-cascading, default:0
+1 = enable anti-cascading, default:0
 .RE
 .PP
 \fBnumusers\fP = \fBquantity\fP
@@ -1041,16 +1238,16 @@ duration of sample, default:2
 quantity of samples over limit, default:10
 .RE
 .PP
-\fBpenalty\fP = \fB0\fP|\fB1\fP|\fB2\fP
+\fBpenalty\fP = \fB0\fP|\fB1\fP|\fB2\fP|\fB3\fP
 .RS 3n
 level of penalty:
 
  \fB0\fP = only logging (default)
  \fB1\fP = send fake CWs
- \fB2\fP = disbable user temporary
+ \fB2\fP = temporary user ban
  \fB3\fP = send delayed CWs
 
-penalty can be overwritten per user in \fBoscam.user\fR
+penalty can be overwritten per user in \fBoscam.user\fR.
 .RE
 .PP
 \fBaclogfile\fP = \fBfilename\fP
@@ -1066,6 +1263,51 @@ fake delay time, default:1000, minimum value is 100, maximum value is 3000
 \fBdenysamples\fP = \fBquantity\fP
 .RS 3n
 how many samples should be penalized, default:8
+.RE
+.PP
+\fBacosc_enabled\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = enable anti-cascading over SID count, default:0
+.RE
+.PP
+\fBacosc_max_active_sids\fP = \fBcount\fP
+.RS 3n
+maximum active SIDs with anti-cascading over SID, 0 = unlimited, default:0
+
+Can be overwritten per user in \fBoscam.user\fR.
+.RE
+.PP
+\fBacosc_zap_limit\fP = \fBcount\fP
+.RS 3n
+zap limit for anti-cascading over SID, 0 = unlimited, default:0
+
+Can be overwritten per user in \fBoscam.user\fR.
+.RE
+.PP
+\fBacosc_penalty\fP = \fB0\fP|\fB1\fP|\fB2\fP|\fB3\fP
+.RS 3n
+level of penalty with anti-cascading over SID count:
+
+ \fB0\fP = only logging (default)
+ \fB1\fP = send fake CWs
+ \fB2\fP = temporary user ban
+ \fB3\fP = send delayed CWs
+
+Can be overwritten per user in \fBoscam.user\fR.
+.RE
+.PP
+\fBacosc_penalty_duration\fP = \fBseconds\fP
+.RS 3n
+penalty duration for anti-cascading over SID count, default:0
+
+Can be overwritten per user in \fBoscam.user\fR.
+.RE
+.PP
+\fBacosc_delay\fP = \fBmilli-seconds\fP
+.RS 3n
+delay for anti-cascading over SID count, default:0
+
+Can be overwritten per user in \fBoscam.user\fR.
 .RE
 .SH LOGGING
 .TP 3n
@@ -1215,4 +1457,4 @@ ECM and CW in cache already.
 
 ECM and checksum in cache already.
 .SH "SEE ALSO"
-\fBlist_smargo\fR(1), \fBoscam\fR(1), \fBoscam.ac\fR(5), \fBoscam.cacheex\fR(5), \fBoscam.cert\fR(5), \fBoscam.dvbapi\fR(5), \fBoscam.guess\fR(5), \fBoscam.ird\fR(5), \fBoscam.provid\fR(5), \fBoscam.server\fR(5), \fBoscam.services\fR(5), \fBoscam.srvid\fR(5), \fBoscam.tiers\fR(5), \fBoscam.user\fR(5), \fBoscam.whitelist\fR(5)
+\fBlist_smargo\fR(1), \fBoscam\fR(1), \fBoscam.ac\fR(5), \fBoscam.cacheex\fR(5), \fBoscam.cert\fR(5), \fBoscam.dvbapi\fR(5), \fBoscam.fakecws\fR(5), \fBoscam.guess\fR(5), \fBoscam.ird\fR(5), \fBoscam.provid\fR(5), \fBoscam.ratelimit\fR(5), \fBoscam.server\fR(5), \fBoscam.services\fR(5), \fBoscam.srvid\fR(5), \fBoscam.srvid2\fR(5), \fBoscam.tiers\fR(5), \fBoscam.user\fR(5), \fBoscam.whitelist\fR(5)

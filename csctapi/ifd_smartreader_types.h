@@ -26,6 +26,14 @@
 #define SIO_READ_EEPROM_REQUEST       0x90
 #define SIO_WRITE_EEPROM_REQUEST      0x91
 #define SIO_ERASE_EEPROM_REQUEST      0x92
+#define CLK_BITS        0x8e
+#define CLK_BYTES       0x8f
+#define CLK_WAIT_HIGH   0x94
+#define CLK_WAIT_LOW    0x95
+#define EN_ADAPTIVE     0x96
+#define DIS_ADAPTIVE    0x97
+#define CLK_BYTES_OR_HIGH 0x9c
+#define CLK_BYTES_OR_LOW  0x0d
 
 #define SIO_RESET_SIO 0
 #define SIO_RESET_PURGE_RX 1
@@ -45,40 +53,54 @@
 
 #define SIO_RTS_CTS_HS (0x1 << 8)
 /** FTDI chip type */
-enum smartreader_chip_type { TYPE_AM=0, TYPE_BM=1, TYPE_2232C=2, TYPE_R=3, TYPE_2232H=4, TYPE_4232H=5 };
+enum smartreader_chip_type { TYPE_AM = 0, TYPE_BM = 1, TYPE_2232C = 2, TYPE_R = 3, TYPE_2232H = 4, TYPE_4232H = 5, TYPE_232H = 6 };
 /** Parity mode for smartreader_set_line_property() */
-enum smartreader_parity_type { NONE=0, ODD=1, EVEN=2, MARK=3, SPACE=4 };
+enum smartreader_parity_type { NONE = 0, ODD = 1, EVEN = 2, MARK = 3, SPACE = 4 };
 /** Number of stop bits for smartreader_set_line_property() */
-enum smartreader_stopbits_type { STOP_BIT_1=0, STOP_BIT_15=1, STOP_BIT_2=2 };
+enum smartreader_stopbits_type { STOP_BIT_1 = 0, STOP_BIT_15 = 1, STOP_BIT_2 = 2 };
 /** Number of bits for smartreader_set_line_property() */
-enum smartreader_bits_type { BITS_7=7, BITS_8=8 };
+enum smartreader_bits_type { BITS_7 = 7, BITS_8 = 8 };
 /** Break type for smartreader_set_line_property2() */
-enum smartreader_break_type { BREAK_OFF=0, BREAK_ON=1 };
+enum smartreader_break_type { BREAK_OFF = 0, BREAK_ON = 1 };
 
 /** Port interface for chips with multiple interfaces */
-enum smartreader_interface
+
+enum smartreader_rdrtypename 
 {
-    INTERFACE_ANY = 0,
-    INTERFACE_A   = 1,
-    INTERFACE_B   = 2,
-    INTERFACE_C   = 3,
-    INTERFACE_D   = 4
+	SR			= 0,
+	Infinity	= 1,
+	SRv2		= 2,
+	TripleP1	= 3,
+	TripleP2	= 4,
+	TripleP3	= 5
 };
 
-struct s_reader_types {
-	char *name;
+enum smartreader_interface
+{
+	INTERFACE_ANY = 0,
+	INTERFACE_A   = 1,
+	INTERFACE_B   = 2,
+	INTERFACE_C   = 3,
+	INTERFACE_D   = 4
+};
+
+struct s_reader_types
+{
+	uint16_t rdrtypename;
 	uint8_t in_ep;
 	uint8_t out_ep;
 	int32_t index;
-	int32_t interface;	
+	int32_t interface;
 };
 
-const struct s_reader_types reader_types[] = { 
-    {"SR", 0x01, 0x82, INTERFACE_A, 0}, 
-    {"Infinity", 0x01, 0x81, INTERFACE_A, 0},
-    {"TripleP1", 0x02, 0x81, INTERFACE_A, 0}, 
-    {"TripleP2", 0x04, 0x83, INTERFACE_B, 1},
-    {"TripleP3", 0x06, 0x85, INTERFACE_C, 2}
+const struct s_reader_types reader_types[] =
+{
+	{ SR, 0x01, 0x82, INTERFACE_A, 0},			//  type 0
+	{ Infinity, 0x01, 0x81, INTERFACE_A, 0},	//  type 1
+	{ SRv2, 0x02, 0x81, INTERFACE_A, 0},		//  type 2
+	{ TripleP1, 0x02, 0x81, INTERFACE_A, 0},	//  type 3
+	{ TripleP2, 0x04, 0x83, INTERFACE_B, 1},	//  type 4
+	{ TripleP3, 0x06, 0x85, INTERFACE_C, 2}		// type 5
 };
 
 #endif // __SMARTREADER_TYPES_H__

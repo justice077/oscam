@@ -34,11 +34,13 @@
 
 #define HOP_RATING 5
 
-typedef enum {
+typedef enum
+{
 	DECRYPT, ENCRYPT
 } cc_crypt_mode_t;
 
-typedef enum {
+typedef enum
+{
 	MSG_CLI_DATA = 0,
 	MSG_CW_ECM = 1,
 	MSG_EMM_ACK = 2,
@@ -55,37 +57,43 @@ typedef enum {
 	MSG_NEW_CARD_SIDINFO = 0x0f,
 	MSG_SLEEPSEND = 0x80, //Sleepsend support
 	MSG_CACHE_PUSH = 0x81, //CacheEx Cache-Push In/Out
+	MSG_CACHE_FILTER = 0x82, //CacheEx Cache-Filter Request
 	MSG_CW_NOK1 = 0xfe, //Node no more available
 	MSG_CW_NOK2 = 0xff, //No decoding
 	MSG_NO_HEADER = 0xffff
 } cc_msg_type_t;
 
-struct cc_crypt_block {
+struct cc_crypt_block
+{
 	uint8_t keytable[256];
 	uint8_t state;
 	uint8_t counter;
 	uint8_t sum;
 };
 
-struct cc_srvid {
+struct cc_srvid
+{
 	uint16_t sid;
 	uint16_t chid;
 	uint8_t ecmlen;
 };
 
-struct cc_srvid_block {
+struct cc_srvid_block
+{
 	uint16_t sid;
 	uint16_t chid;
 	uint8_t  ecmlen;
 	time_t   blocked_till;
 };
 
-struct cc_provider {
+struct cc_provider
+{
 	uint32_t prov;  //provider
 	uint8_t sa[4]; //shared address
 };
 
-typedef enum {
+typedef enum
+{
 	CT_LOCALCARD = 1,
 	CT_CARD_BY_SERVICE_READER = 2,
 	CT_CARD_BY_SERVICE_USER = 3,
@@ -95,7 +103,8 @@ typedef enum {
 	CT_REMOTECARD = 10
 } cc_card_type;
 
-struct cc_card {
+struct cc_card
+{
 	uint32_t id; // cccam card (share) id - reader
 	uint32_t remote_id;
 	uint16_t caid;
@@ -103,13 +112,12 @@ struct cc_card {
 	uint8_t reshare;
 	uint8_t hexserial[8]; // card serial (for au)
 	LLIST *providers; // providers (struct cc_provider)
-	LLIST *badsids; // sids that have failed to decode (struct cc_srvid)
+	LLIST *badsids; // sids that have failed to decode (struct cc_srvid_block)
 	LLIST *goodsids; //sids that could decoded (struct cc_srvid)
 	LLIST *remote_nodes; //remote note id, 8 bytes
 	struct s_reader  *origin_reader;
 	uint32_t origin_id;
 	cc_card_type card_type;
-	int8_t aufilter;
 	struct s_sidtab *sidtab; //pointer to sidtab entry if card_type = CT_CARD_BY_SERVICE
 	uint64_t grp;
 	uint8_t rdr_reshare;
@@ -119,7 +127,8 @@ struct cc_card {
 	int8_t rating;
 };
 
-typedef enum {
+typedef enum
+{
 	MODE_UNKNOWN = 0,
 	MODE_PLAIN = 1,
 	MODE_AES = 2,
@@ -128,7 +137,8 @@ typedef enum {
 	MODE_LEN0 = 5,
 } cc_cmd05_mode;
 
-typedef enum {
+typedef enum
+{
 	MODE_CMD_0x0C_NONE = 0,
 	MODE_CMD_0x0C_RC6 = 1,
 	MODE_CMD_0x0C_RC4 = 2,
@@ -138,26 +148,28 @@ typedef enum {
 } cc_cmd0c_mode;
 
 
-struct cc_extended_ecm_idx {
+struct cc_extended_ecm_idx
+{
 	uint8_t send_idx;
 	uint16_t ecm_idx;
 	struct cc_card *card;
 	struct cc_srvid srvid;
 	uint8_t free_card;
-	struct timeb	tps;
+	struct timeb    tps;
 	uint32_t cccam_id;
 };
 
-struct cc_data {
+struct cc_data
+{
 	uint8_t g_flag;
 	char *prefix;
 
 	struct cc_crypt_block block[2]; // crypto state blocks
 
 	uint8_t node_id[8], // client node id
-		peer_node_id[8], // server node id
-		peer_version[8], // server version
-		dcw[16]; // control words
+			peer_node_id[8], // server node id
+			peer_version[8], // server version
+			dcw[16]; // control words
 	uint8_t cmd0b_aeskey[16];
 	uint8_t cmd05_aeskey[16];
 	struct cc_crypt_block cmd05_cryptkey;
@@ -199,7 +211,6 @@ struct cc_data {
 	int8_t ecm_busy;
 	CS_MUTEX_LOCK cards_busy;
 	struct timeb ecm_time;
-	time_t answer_on_keepalive;
 	uint8_t last_msg;
 	uint8_t cmd05NOK;
 
@@ -215,6 +226,10 @@ struct cc_data {
 	uint8_t extended_mode;
 	LLIST *extended_ecm_idx;
 
+	//multics detection
+	int8_t multics_mode;
+	int8_t multics_version[2];
+
 	//stats:
 	int32_t num_hop1;
 	int32_t num_hop2;
@@ -225,7 +240,7 @@ struct cc_data {
 	int32_t num_reshare2;
 	int32_t num_resharex;
 
-	char* nok_message;
+	char *nok_message;
 };
 
 #endif

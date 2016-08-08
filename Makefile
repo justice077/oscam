@@ -2,12 +2,17 @@ SHELL = /bin/sh
 
 .SUFFIXES:
 .SUFFIXES: .o .c
-.PHONY: all help README.build README.config simple default debug config menuconfig allyesconfig allnoconfig defconfig clean distclean
+.PHONY: all tests help README.build README.config simple default debug config menuconfig allyesconfig allnoconfig defconfig clean distclean
 
 VER     := $(shell ./config.sh --oscam-version)
 SVN_REV := $(shell ./config.sh --oscam-revision)
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+
+# This let's us use uname_S tests to detect cygwin
+ifneq (,$(findstring CYGWIN,$(uname_S)))
+	uname_S := Cygwin
+endif
 
 LINKER_VER_OPT:=-Wl,--version
 
@@ -34,11 +39,18 @@ CONF_DIR = /usr/local/etc
 
 LIB_PTHREAD = -lpthread
 LIB_DL = -ldl
+
+LIB_RT :=
+ifeq ($(uname_S),Linux)
+ifeq "$(shell ./config.sh --enabled CLOCKFIX)" "Y"
+	LIB_RT := -lrt
+endif
+endif
 ifeq ($(uname_S),FreeBSD)
 LIB_DL :=
 endif
 
-override STD_LIBS := $(LIB_PTHREAD) $(LIB_DL)
+override STD_LIBS := $(LIB_PTHREAD) $(LIB_DL) $(LIB_RT)
 override STD_DEFS := -D'CS_SVN_VERSION="$(SVN_REV)"'
 override STD_DEFS += -D'CS_CONFDIR="$(CONF_DIR)"'
 
@@ -80,7 +92,10 @@ TARGET := $(shell $(CC) -dumpmachine 2>/dev/null)
 
 # Process USE_ variables
 DEFAULT_STAPI_LIB = -L./stapi -loscam_stapi
+DEFAULT_STAPI5_LIB = -L./stapi -loscam_stapi5
 DEFAULT_COOLAPI_LIB = -lnxp -lrt
+DEFAULT_COOLAPI2_LIB = -llnxUKAL -llnxcssUsr -llnxscsUsr -llnxnotifyqUsr -llnxplatUsr -lrt
+DEFAULT_SU980_LIB = -lentropic -lrt
 DEFAULT_AZBOX_LIB = -Lextapi/openxcas -lOpenXCASAPI
 DEFAULT_LIBCRYPTO_LIB = -lcrypto
 DEFAULT_SSL_LIB = -lssl
@@ -89,13 +104,38 @@ DEFAULT_LIBUSB_LIB = -lusb-1.0 -lrt
 else
 DEFAULT_LIBUSB_LIB = -lusb-1.0
 endif
+# Since FreeBSD 8 (released in 2010) they are using their own
+# libusb that is API compatible to libusb but with different soname
+ifeq ($(uname_S),FreeBSD)
+DEFAULT_LIBUSB_LIB = -lusb
+endif
 ifeq ($(uname_S),Darwin)
-DEFAULT_PCSC_FLAGS = -isysroot $(OSX_SDK) -I/usr/local/include
-DEFAULT_PCSC_LIB = -syslibroot,$(OSX_SDK) -framework IOKit -framework CoreFoundation -framework PCSC -L/usr/local/lib
+DEFAULT_LIBUSB_FLAGS = -I/opt/local/include
+DEFAULT_LIBUSB_LIB = -L/opt/local/lib -lusb-1.0
+DEFAULT_PCSC_FLAGS = -isysroot $(OSX_SDK)
+DEFAULT_PCSC_LIB = -isysroot $(OSX_SDK) -framework IOKit -framework CoreFoundation -framework PCSC
 else
-DEFAULT_PCSC_FLAGS = -I/usr/include/PCSC
+# Get the compiler's last include PATHs. Basicaly it is /usr/include
+# but in case of cross compilation it might be something else.
+#
+# Since using -Iinc_path instructs the compiler to use inc_path
+# (without add the toolchain system root) we need to have this hack
+# to get the "real" last include path. Why we needs this?
+# Well, the PCSC headers are broken and rely on having the directory
+# that they are installed it to be in the include PATH.
+#
+# We can't just use -I/usr/include/PCSC because it won't work in
+# case of cross compilation.
+TOOLCHAIN_INC_DIR := $(strip $(shell echo | $(CC) -Wp,-v -xc - -fsyntax-only 2>&1 | grep include$ | tail -n 1))
+DEFAULT_PCSC_FLAGS = -I$(TOOLCHAIN_INC_DIR)/PCSC -I$(TOOLCHAIN_INC_DIR)/../local/include/PCSC
 DEFAULT_PCSC_LIB = -lpcsclite
 endif
+
+ifeq ($(uname_S),Cygwin)
+DEFAULT_PCSC_LIB += -lwinscard
+endif
+
+DEFAULT_UTF8_FLAGS = -DWITH_UTF8
 
 # Function to initialize USE related variables
 #   Usage: $(eval $(call prepare_use_flags,FLAG_NAME,PLUS_TARGET_TEXT))
@@ -118,13 +158,17 @@ endef
 
 # Initialize USE variables
 $(eval $(call prepare_use_flags,STAPI,stapi))
+$(eval $(call prepare_use_flags,STAPI5,stapi5))
 $(eval $(call prepare_use_flags,COOLAPI,coolapi))
+$(eval $(call prepare_use_flags,COOLAPI2,coolapi2))
+$(eval $(call prepare_use_flags,SU980,su980))
 $(eval $(call prepare_use_flags,AZBOX,azbox))
 $(eval $(call prepare_use_flags,MCA,mca))
 $(eval $(call prepare_use_flags,SSL,ssl))
 $(eval $(call prepare_use_flags,LIBCRYPTO,))
 $(eval $(call prepare_use_flags,LIBUSB,libusb))
 $(eval $(call prepare_use_flags,PCSC,pcsc))
+$(eval $(call prepare_use_flags,UTF8))
 
 # Add PLUS_TARGET and EXTRA_TARGET to TARGET
 ifdef NO_PLUS_TARGET
@@ -163,6 +207,7 @@ OBJDIR := $(BUILD_DIR)/$(TARGET)
 -include $(OBJDIR)/config.mak
 
 OSCAM_BIN := $(BINDIR)/oscam-$(VER)$(SVN_REV)-$(subst cygwin,cygwin.exe,$(TARGET))
+TESTS_BIN := tests.bin
 LIST_SMARGO_BIN := $(BINDIR)/list_smargo-$(VER)$(SVN_REV)-$(subst cygwin,cygwin.exe,$(TARGET))
 
 # Build list_smargo-.... only when WITH_LIBUSB build is requested.
@@ -198,22 +243,28 @@ SRC-$(CONFIG_WITH_CARDREADER) += csctapi/protocol_t0.c
 SRC-$(CONFIG_WITH_CARDREADER) += csctapi/protocol_t1.c
 SRC-$(CONFIG_CARDREADER_INTERNAL_AZBOX) += csctapi/ifd_azbox.c
 SRC-$(CONFIG_CARDREADER_INTERNAL_COOLAPI) += csctapi/ifd_cool.c
+SRC-$(CONFIG_CARDREADER_INTERNAL_COOLAPI2) += csctapi/ifd_cool.c
 SRC-$(CONFIG_CARDREADER_DB2COM) += csctapi/ifd_db2com.c
 SRC-$(CONFIG_CARDREADER_MP35) += csctapi/ifd_mp35.c
 SRC-$(CONFIG_CARDREADER_PCSC) += csctapi/ifd_pcsc.c
 SRC-$(CONFIG_CARDREADER_PHOENIX) += csctapi/ifd_phoenix.c
+SRC-$(CONFIG_CARDREADER_DRECAS) += csctapi/ifd_drecas.c
 SRC-$(CONFIG_CARDREADER_SC8IN1) += csctapi/ifd_sc8in1.c
 SRC-$(CONFIG_CARDREADER_INTERNAL_SCI) += csctapi/ifd_sci.c
 SRC-$(CONFIG_CARDREADER_SMARGO) += csctapi/ifd_smargo.c
 SRC-$(CONFIG_CARDREADER_SMART) += csctapi/ifd_smartreader.c
+SRC-$(CONFIG_CARDREADER_STINGER) += csctapi/ifd_stinger.c
 SRC-$(CONFIG_CARDREADER_STAPI) += csctapi/ifd_stapi.c
+SRC-$(CONFIG_CARDREADER_STAPI5) += csctapi/ifd_stapi.c
 
 SRC-$(CONFIG_LIB_MINILZO) += minilzo/minilzo.c
 
 SRC-$(CONFIG_CS_ANTICASC) += module-anticasc.c
 SRC-$(CONFIG_CS_CACHEEX) += module-cacheex.c
 SRC-$(CONFIG_MODULE_CAMD33) += module-camd33.c
+SRC-$(CONFIG_CS_CACHEEX) += module-camd35-cacheex.c
 SRC-$(sort $(CONFIG_MODULE_CAMD35) $(CONFIG_MODULE_CAMD35_TCP)) += module-camd35.c
+SRC-$(CONFIG_CS_CACHEEX) += module-cccam-cacheex.c
 SRC-$(CONFIG_MODULE_CCCAM) += module-cccam.c
 SRC-$(CONFIG_MODULE_CCCSHARE) += module-cccshare.c
 SRC-$(CONFIG_MODULE_CONSTCW) += module-constcw.c
@@ -222,17 +273,26 @@ SRC-$(CONFIG_CW_CYCLE_CHECK) += module-cw-cycle-check.c
 SRC-$(CONFIG_WITH_AZBOX) += module-dvbapi-azbox.c
 SRC-$(CONFIG_WITH_MCA) += module-dvbapi-mca.c
 SRC-$(CONFIG_WITH_COOLAPI) += module-dvbapi-coolapi.c
+SRC-$(CONFIG_WITH_COOLAPI2) += module-dvbapi-coolapi.c
+SRC-$(CONFIG_WITH_SU980) += module-dvbapi-coolapi.c
 SRC-$(CONFIG_WITH_STAPI) += module-dvbapi-stapi.c
+SRC-$(CONFIG_WITH_STAPI5) += module-dvbapi-stapi5.c
+SRC-$(CONFIG_HAVE_DVBAPI) += module-dvbapi-chancache.c
 SRC-$(CONFIG_HAVE_DVBAPI) += module-dvbapi.c
+SRC-$(CONFIG_MODULE_GBOX) += module-gbox-helper.c
+SRC-$(CONFIG_MODULE_GBOX) += module-gbox-sms.c
+SRC-$(CONFIG_MODULE_GBOX) += module-gbox-cards.c
 SRC-$(CONFIG_MODULE_GBOX) += module-gbox.c
 SRC-$(CONFIG_IRDETO_GUESSING) += module-ird-guess.c
 SRC-$(CONFIG_LCDSUPPORT) += module-lcd.c
 SRC-$(CONFIG_LEDSUPPORT) += module-led.c
 SRC-$(CONFIG_MODULE_MONITOR) += module-monitor.c
 SRC-$(CONFIG_MODULE_NEWCAMD) += module-newcamd.c
+SRC-$(CONFIG_MODULE_NEWCAMD) += module-newcamd-des.c
 SRC-$(CONFIG_MODULE_PANDORA) += module-pandora.c
 SRC-$(CONFIG_MODULE_GHTTP) += module-ghttp.c
 SRC-$(CONFIG_MODULE_RADEGAST) += module-radegast.c
+SRC-$(CONFIG_MODULE_SCAM) += module-scam.c
 SRC-$(CONFIG_MODULE_SERIAL) += module-serial.c
 SRC-$(CONFIG_WITH_LB) += module-stat.c
 SRC-$(CONFIG_WEBIF) += module-webif-lib.c
@@ -245,6 +305,9 @@ SRC-$(CONFIG_READER_CONAX) += reader-conax.c
 SRC-$(CONFIG_READER_CRYPTOWORKS) += reader-cryptoworks.c
 SRC-$(CONFIG_READER_DGCRYPT) += reader-dgcrypt.c
 SRC-$(CONFIG_READER_DRE) += reader-dre.c
+SRC-$(CONFIG_READER_DRE) += reader-dre-cas.c
+SRC-$(CONFIG_READER_DRE) += reader-dre-common.c
+SRC-$(CONFIG_READER_DRE) += reader-dre-st20.c
 SRC-$(CONFIG_READER_GRIFFIN) += reader-griffin.c
 SRC-$(CONFIG_READER_IRDETO) += reader-irdeto.c
 SRC-$(CONFIG_READER_NAGRA) += reader-nagra.c
@@ -256,6 +319,9 @@ SRC-$(CONFIG_READER_VIDEOGUARD) += reader-videoguard1.c
 SRC-$(CONFIG_READER_VIDEOGUARD) += reader-videoguard12.c
 SRC-$(CONFIG_READER_VIDEOGUARD) += reader-videoguard2.c
 SRC-y += oscam-aes.c
+SRC-y += oscam-array.c
+SRC-y += oscam-hashtable.c
+SRC-y += oscam-cache.c
 SRC-y += oscam-chk.c
 SRC-y += oscam-client.c
 SRC-y += oscam-conf.c
@@ -267,6 +333,7 @@ SRC-y += oscam-config-reader.c
 SRC-y += oscam-config.c
 SRC-y += oscam-ecm.c
 SRC-y += oscam-emm.c
+SRC-y += oscam-emm-cache.c
 SRC-y += oscam-failban.c
 SRC-y += oscam-files.c
 SRC-y += oscam-garbage.c
@@ -283,6 +350,10 @@ SRC-y += oscam-work.c
 SRC-y += oscam.c
 # config.c is automatically generated by config.sh in OBJDIR
 SRC-y += config.c
+ifdef BUILD_TESTS
+SRC-y += tests.c
+override STD_DEFS += -DBUILD_TESTS=1
+endif
 
 SRC := $(SRC-y)
 OBJ := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(SRC)))
@@ -308,11 +379,12 @@ all:
 |  LIBS     = $(strip $(LIBS))\n\
 |  UseFlags = $(addsuffix =1,$(USE_FLAGS))\n\
 | Config:\n\
-|  Addons   : $(shell ./config.sh --show-enabled addons)\n\
-|  Protocols: $(shell ./config.sh --show-enabled protocols | sed -e 's|MODULE_||g')\n\
-|  Readers  : $(shell ./config.sh --show-enabled readers | sed -e 's|READER_||g')\n\
-|  CardRdrs : $(shell ./config.sh --show-enabled card_readers | sed -e 's|CARDREADER_||g')\n\
+|  Addons   : $(shell ./config.sh --use-flags "$(USE_FLAGS)" --show-enabled addons)\n\
+|  Protocols: $(shell ./config.sh --use-flags "$(USE_FLAGS)" --show-enabled protocols | sed -e 's|MODULE_||g')\n\
+|  Readers  : $(shell ./config.sh --use-flags "$(USE_FLAGS)" --show-enabled readers | sed -e 's|READER_||g')\n\
+|  CardRdrs : $(shell ./config.sh --use-flags "$(USE_FLAGS)" --show-enabled card_readers | sed -e 's|CARDREADER_||g')\n\
 |  Compiler : $(shell $(CC) --version 2>/dev/null | head -n 1)\n\
+|  Config   : $(OBJDIR)/config.mak\n\
 |  Binary   : $(OSCAM_BIN)\n\
 +-------------------------------------------------------------------------------\n"
 ifeq "$(shell ./config.sh --enabled WEBIF)" "Y"
@@ -344,6 +416,14 @@ $(OBJDIR)/%.o: %.c Makefile
 
 -include $(subst .o,.d,$(OBJ))
 
+tests:
+	@-$(MAKE) --no-print-directory BUILD_TESTS=1 OSCAM_BIN=$(TESTS_BIN)
+	@-touch oscam.c
+# The above is really hideous hack :-) If we don't force oscam.c recompilation
+# after we've build the tests binary, the next "normal" compilation would fail
+# because there would be no run_tests() function. So the touch is there to
+# ensure oscam.c would be recompiled.
+
 config:
 	$(SHELL) ./config.sh --gui
 
@@ -362,7 +442,7 @@ defconfig:
 	@-$(SHELL) ./config.sh --restore
 
 clean:
-	@-for FILE in $(BUILD_DIR)/*; do \
+	@-for FILE in $(BUILD_DIR)/* $(TESTS_BIN) $(TESTS_BIN).debug; do \
 		echo "RM	$$FILE"; \
 		rm -rf $$FILE; \
 	done
@@ -475,7 +555,7 @@ OSCam build system documentation\n\
                      Using USE_LIBUSB=1 adds to '-libusb' to PLUS_TARGET.\n\
                      To build with static libusb, set the variable LIBUSB_LIB\n\
                      to contain full path of libusb library. For example:\n\
-                      make USR_LIBUSB=1 LIBUSB_LIB=/usr/lib/libusb-1.0.a\n\
+                      make USE_LIBUSB=1 LIBUSB_LIB=/usr/lib/libusb-1.0.a\n\
 \n\
    USE_PCSC=1      - Request linking with PCSC. The variables that control\n\
                      USE_PCSC=1 build are:\n\
@@ -498,6 +578,16 @@ OSCam build system documentation\n\
                      In order for USE_STAPI to work you have to create stapi\n\
                      directory and put liboscam_stapi.a file in it.\n\
 \n\
+   USE_STAPI5=1    - Request linking with STAPI5. The variables that control\n\
+                     USE_STAPI5=1 build are:\n\
+                         STAPI5_FLAGS='$(DEFAULT_STAPI5_FLAGS)'\n\
+                         STAPI5_CFLAGS='$(DEFAULT_STAPI5_FLAGS)'\n\
+                         STAPI5_LDFLAGS='$(DEFAULT_STAPI5_FLAGS)'\n\
+                         STAPI5_LIB='$(DEFAULT_STAPI5_LIB)'\n\
+                     Using USE_STAPI5=1 adds to '-stapi' to PLUS_TARGET.\n\
+                     In order for USE_STAPI5 to work you have to create stapi\n\
+                     directory and put liboscam_stapi5.a file in it.\n\
+\n\
    USE_COOLAPI=1  - Request support for Coolstream API (libnxp) aka NeutrinoHD\n\
                     box. The variables that control the build are:\n\
                          COOLAPI_FLAGS='$(DEFAULT_COOLAPI_FLAGS)'\n\
@@ -506,6 +596,27 @@ OSCam build system documentation\n\
                          COOLAPI_LIB='$(DEFAULT_COOLAPI_LIB)'\n\
                      Using USE_COOLAPI=1 adds to '-coolapi' to PLUS_TARGET.\n\
                      In order for USE_COOLAPI to work you have to have libnxp.so\n\
+                     library in your cross compilation toolchain.\n\
+\n\
+   USE_COOLAPI2=1  - Request support for Coolstream API aka NeutrinoHD\n\
+                    box. The variables that control the build are:\n\
+                         COOLAPI_FLAGS='$(DEFAULT_COOLAPI2_FLAGS)'\n\
+                         COOLAPI_CFLAGS='$(DEFAULT_COOLAPI2_FLAGS)'\n\
+                         COOLAPI_LDFLAGS='$(DEFAULT_COOLAPI2_FLAGS)'\n\
+                         COOLAPI_LIB='$(DEFAULT_COOLAPI2_LIB)'\n\
+                     Using USE_COOLAPI2=1 adds to '-coolapi2' to PLUS_TARGET.\n\
+                     In order for USE_COOLAPI2 to work you have to have liblnxUKAL.so,\n\
+                     liblnxcssUsr.so, liblnxscsUsr.so, liblnxnotifyqUsr.so, liblnxplatUsr.so\n\
+                     library in your cross compilation toolchain.\n\
+\n\
+   USE_SU980=1  - Request support for SU980 API (libentropic) aka Enimga2 arm\n\
+                    box. The variables that control the build are:\n\
+                         COOLAPI_FLAGS='$(DEFAULT_SU980_FLAGS)'\n\
+                         COOLAPI_CFLAGS='$(DEFAULT_SU980_FLAGS)'\n\
+                         COOLAPI_LDFLAGS='$(DEFAULT_SU980_FLAGS)'\n\
+                         COOLAPI_LIB='$(DEFAULT_SU980_LIB)'\n\
+                     Using USE_SU980=1 adds to '-su980' to PLUS_TARGET.\n\
+                     In order for USE_SU980 to work you have to have libentropic.a\n\
                      library in your cross compilation toolchain.\n\
 \n\
    USE_AZBOX=1    - Request support for AZBOX (openxcas)\n\
@@ -542,6 +653,8 @@ OSCam build system documentation\n\
                          SSL_LDFLAGS='$(DEFAULT_SSL_FLAGS)'\n\
                          SSL_LIB='$(DEFAULT_SSL_LIB)'\n\
                      Using USE_SSL=1 adds to '-ssl' to PLUS_TARGET.\n\
+\n\
+   USE_UTF8=1       - Request UTF-8 enabled webif by default.\n\
 \n\
  Automatically intialized variables:\n\
 \n\
@@ -615,7 +728,8 @@ OSCam build system documentation\n\
     make sh4           - Builds OSCam for SH4 boxes\n\
     make azbox         - Builds OSCam for AZBox STBs\n\
     make mca           - Builds OSCam for Matrix Cam Air (MCA)\n\
-    make coolstream    - Builds OSCam for Coolstream\n\
+    make coolstream    - Builds OSCam for Coolstream HD1\n\
+    make coolstream2   - Builds OSCam for Coolstream HD2\n\
     make dockstar      - Builds OSCam for Dockstar\n\
     make qboxhd        - Builds OSCam for QBoxHD STBs\n\
     make opensolaris   - Builds OSCam for OpenSolaris\n\
@@ -626,6 +740,9 @@ OSCam build system documentation\n\
     make static-libusb - Builds OSCam with libusb linked statically\n\
     make static-libcrypto - Builds OSCam with libcrypto linked statically\n\
     make static-ssl    - Builds OSCam with SSL support linked statically\n\
+\n\
+ Developer targets:\n\
+    make tests         - Builds '$(TESTS_BIN)' binary\n\
 \n\
  Examples:\n\
    Build OSCam for SH4 (the compilers are in the path):\n\
@@ -640,6 +757,8 @@ OSCam build system documentation\n\
      make CROSS=sh4-linux- USE_STAPI=1 CONF_DIR=/var/tuxbox/config\n\n\
    Build OSCam for ARM with COOLAPI (coolstream aka NeutrinoHD):\n\
      make CROSS=arm-cx2450x-linux-gnueabi- USE_COOLAPI=1\n\n\
+   Build OSCam for ARM with COOLAPI2 (coolstream aka NeutrinoHD):\n\
+     make CROSS=arm-pnx8400-linux-uclibcgnueabi- USE_COOLAPI2=1\n\n\
    Build OSCam for MIPSEL with AZBOX support:\n\
      make CROSS=mipsel-linux-uclibc- USE_AZBOX=1\n\n\
    Build OSCam for ARM with MCA support:\n\

@@ -4,44 +4,52 @@
 /* timeouts in ETU */
 typedef struct
 {
-   uint16_t  CardActTime;
-   uint16_t  CardDeactTime;  
-   uint16_t  ATRSTime; 
-   uint16_t  ATRDTime; 
-   uint32_t  BLKTime;
-   uint32_t  CHTime;
-   uint8_t   CHGuardTime;
-   uint8_t   BKGuardTime;  
+	uint16_t  CardActTime;
+	uint16_t  CardDeactTime;
+	uint16_t  ATRSTime;
+	uint16_t  ATRDTime;
+	uint32_t  BLKTime;
+	uint32_t  CHTime;
+	uint8_t   CHGuardTime;
+	uint8_t   BKGuardTime;
 } CNXT_SMC_TIMEOUT;
 
 typedef struct
 {
-   uint8_t   		TXRetries;
-   uint8_t   		RXRetries;
+	uint8_t   		TXRetries;
+	uint8_t   		RXRetries;
 } CNXT_SMC_RETRIES;
 
-typedef enum 
+typedef enum
 {
-   CNXT_SMC_CONV_DIRECT = 0,
-   CNXT_SMC_CONV_INVERSE,
-   CNXT_SMC_CONV_LAST = CNXT_SMC_CONV_INVERSE
+	CNXT_SMC_CONV_DIRECT = 0,
+	CNXT_SMC_CONV_INVERSE,
+	CNXT_SMC_CONV_LAST = CNXT_SMC_CONV_INVERSE
 } CNXT_SMC_CONVENTION;
 
 typedef struct
 {
-   CNXT_SMC_CONVENTION	convention;
-   uint8_t				protocol;
-   uint8_t				FI;
-   uint8_t				N;
-   uint8_t				DI;
-   uint8_t				PI1;
-   uint8_t				PI2;
-   uint8_t				II;
-   uint8_t				historical[15];
-   uint8_t				length;
-   CNXT_SMC_RETRIES		retries;
-   uint8_t				filterprotocolbytes;
+	CNXT_SMC_CONVENTION	convention;
+	uint8_t				protocol;
+	uint8_t				FI;
+	uint8_t				N;
+	uint8_t				DI;
+	uint8_t				PI1;
+	uint8_t				PI2;
+	uint8_t				II;
+	uint8_t				historical[15];
+	uint8_t				length;
+	CNXT_SMC_RETRIES		retries;
+	uint8_t				filterprotocolbytes;
 } CNXT_SMC_COMM;
+
+typedef struct
+{
+   uint8_t   *pStartAddress;
+   uint8_t   *pEndAddress;
+   uint8_t   *pWriteAddress;
+   uint8_t   *pReadAddress;
+} CNXT_CBUF_POINTERS;
 
 /* These functions are implemented in libnxp and are used in coolstream */
 int32_t cnxt_cbuf_init(void *);
@@ -51,6 +59,8 @@ int32_t cnxt_cbuf_detach(void *handle, int32_t type, void * channel);
 int32_t cnxt_cbuf_close(void * handle);
 int32_t cnxt_cbuf_read_data(void * handle, void *buffer, uint32_t size, uint32_t * ret_size);
 int32_t cnxt_cbuf_flush(void * handle, int);
+int32_t cnxt_cbuf_removed_data(void *handle, uint32_t bytes);
+int32_t cnxt_cbuf_get_pointers(void *handle, CNXT_CBUF_POINTERS *buffer_pointers);
 
 void cnxt_kal_initialize(void);
 void cnxt_kal_terminate(void);
@@ -82,10 +92,14 @@ int32_t cnxt_smc_reset_card(void *cool_handle, int32_t timeout, void *, void *);
 int32_t cnxt_smc_get_atr(void *cool_handle, unsigned char *buf, int32_t *buflen);
 int32_t cnxt_smc_get_comm_parameters(void *cool_handle, CNXT_SMC_COMM *comm);
 int32_t cnxt_smc_get_config_timeout(void *cool_handle, CNXT_SMC_TIMEOUT *timeout);
-int32_t cnxt_smc_get_F_D_factors (void *cool_handle, uint16_t *F, uint8_t *D);
+int32_t cnxt_smc_set_config_timeout(void *cool_handle, CNXT_SMC_TIMEOUT timeout);
+int32_t cnxt_smc_set_convention(void *cool_handle, CNXT_SMC_CONVENTION conv);
+int32_t cnxt_smc_start_pps(void *cool_handle, uint8_t *params, uint8_t *response, uint8_t *len, int32_t setfd);
+int32_t cnxt_smc_get_F_D_factors(void *cool_handle, uint16_t *F, uint8_t *D);
+int32_t cnxt_smc_set_F_D_factors(void *cool_handle, uint16_t F, uint8_t D);
 int32_t cnxt_smc_read_write(void *cool_handle, int8_t async, uint8_t *sent, uint32_t size, uint8_t *cardbuffer, uint32_t *cardbuflen, int32_t rw_timeout, void *tag);
 int32_t cnxt_smc_set_clock_freq(void *cool_handle, int32_t clk);
-int32_t cnxt_smc_set_filter_protocol_bytes (void *cool_handle, int32_t enable);
+int32_t cnxt_smc_set_filter_protocol_bytes(void *cool_handle, int32_t enable);
 int32_t cnxt_smc_close(void *cool_handle);
 
 /* Error checking */
@@ -215,7 +229,7 @@ do { \
 	} \
 } while(0)
 
-#if defined(HAVE_DVBAPI) && defined(WITH_COOLAPI)
+#if defined(HAVE_DVBAPI) && (defined(WITH_COOLAPI) || defined(WITH_SU980) || defined(WITH_COOLAPI2))
 extern void coolapi_open_all(void);
 extern void coolapi_close_all(void);
 #else

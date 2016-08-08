@@ -80,13 +80,13 @@ OSCam build system documentation
                      Using USE_LIBUSB=1 adds to '-libusb' to PLUS_TARGET.
                      To build with static libusb, set the variable LIBUSB_LIB
                      to contain full path of libusb library. For example:
-                      make USR_LIBUSB=1 LIBUSB_LIB=/usr/lib/libusb-1.0.a
+                      make USE_LIBUSB=1 LIBUSB_LIB=/usr/lib/libusb-1.0.a
 
    USE_PCSC=1      - Request linking with PCSC. The variables that control
                      USE_PCSC=1 build are:
-                         PCSC_FLAGS='-DWITH_PCSC=1 -I/usr/include/PCSC'
-                         PCSC_CFLAGS='-DWITH_PCSC=1 -I/usr/include/PCSC'
-                         PCSC_LDFLAGS='-DWITH_PCSC=1 -I/usr/include/PCSC'
+                         PCSC_FLAGS='-DWITH_PCSC=1 -I/usr/include/PCSC -I/usr/include/../local/include/PCSC'
+                         PCSC_CFLAGS='-DWITH_PCSC=1 -I/usr/include/PCSC -I/usr/include/../local/include/PCSC'
+                         PCSC_LDFLAGS='-DWITH_PCSC=1 -I/usr/include/PCSC -I/usr/include/../local/include/PCSC'
                          PCSC_LIB='-lpcsclite'
                      Using USE_PCSC=1 adds to '-pcsc' to PLUS_TARGET.
                      To build with static PCSC, set the variable PCSC_LIB
@@ -102,6 +102,16 @@ OSCam build system documentation
                      Using USE_STAPI=1 adds to '-stapi' to PLUS_TARGET.
                      In order for USE_STAPI to work you have to create stapi
                      directory and put liboscam_stapi.a file in it.
+                     
+   USE_STAPI5=1    - Request linking with STAPI5. The variables that control
+                     USE_STAPI5=1 build are:
+                         STAPI5_FLAGS='-DWITH_STAPI5=1'
+                         STAPI5_CFLAGS='-DWITH_STAPI5=1'
+                         STAPI5_LDFLAGS='-DWITH_STAPI5=1'
+                         STAPI5_LIB='-L./stapi -loscam_stapi5'
+                     Using USE_STAPI5=1 adds to '-stapi' to PLUS_TARGET.
+                     In order for USE_STAPI5 to work you have to create stapi
+                     directory and put liboscam_stapi5.a file in it.
 
    USE_COOLAPI=1  - Request support for Coolstream API (libnxp) aka NeutrinoHD
                     box. The variables that control the build are:
@@ -111,6 +121,16 @@ OSCam build system documentation
                          COOLAPI_LIB='-lnxp -lrt'
                      Using USE_COOLAPI=1 adds to '-coolapi' to PLUS_TARGET.
                      In order for USE_COOLAPI to work you have to have libnxp.so
+                     library in your cross compilation toolchain.
+
+   USE_SU980=1  - Request support for SU980 API (libentropic) aka Enimga2 arm
+                    box. The variables that control the build are:
+                         COOLAPI_FLAGS='-DWITH_SU980=1'
+                         COOLAPI_CFLAGS='-DWITH_SU980=1'
+                         COOLAPI_LDFLAGS='-DWITH_SU980=1'
+                         COOLAPI_LIB='-lentropic -lrt'
+                     Using USE_SU980=1 adds to '-su980' to PLUS_TARGET.
+                     In order for USE_SU980 to work you have to have libentropic.a
                      library in your cross compilation toolchain.
 
    USE_AZBOX=1    - Request support for AZBOX (openxcas)
@@ -231,6 +251,9 @@ OSCam build system documentation
     make static-libusb - Builds OSCam with libusb linked statically
     make static-libcrypto - Builds OSCam with libcrypto linked statically
     make static-ssl    - Builds OSCam with SSL support linked statically
+
+ Developer targets:
+    make tests         - Builds 'tests.bin' binary
 
  Examples:
    Build OSCam for SH4 (the compilers are in the path):

@@ -46,6 +46,25 @@ additionally to log to stdout or syslog (you can also only log to stdout or sysl
 the filename).
 </DL>
 
+PP
+<B>initial_debuglevel</B> = <B>level</B>
+<DL COMPACT><DT><DD>
+set initial debug level for OSCam start, default:0
+</DL>
+
+PP
+<B>sysloghost</B> = <B>hostname</B>
+<DL COMPACT><DT><DD>
+set remote syslog host, default:none
+</DL>
+
+<P>
+
+<B>syslogport</B> = <B>port</B>
+<DL COMPACT><DT><DD>
+set TCP/IP port for remote syslog host, default:none
+</DL>
+
 <P>
 
 <B>ecmfmt</B> = <B>format</B>
@@ -55,14 +74,18 @@ define ECM log format, default:c&amp;p/i/s/l:h
 possible variables:
 <P>
 <BR>&nbsp;&nbsp;<B>c</B>&nbsp;=&nbsp;CAID
-<BR>&nbsp;&nbsp;<B>p</B>&nbsp;=&nbsp;provider&nbsp;ID
-<BR>&nbsp;&nbsp;<B>i</B>&nbsp;=&nbsp;Channel&nbsp;ID
 <BR>&nbsp;&nbsp;<B>d</B>&nbsp;=&nbsp;PID
-<BR>&nbsp;&nbsp;<B>s</B>&nbsp;=&nbsp;service&nbsp;ID
-<BR>&nbsp;&nbsp;<B>l</B>&nbsp;=&nbsp;length
-<BR>&nbsp;&nbsp;<B>h</B>&nbsp;=&nbsp;checksum
 <BR>&nbsp;&nbsp;<B>e</B>&nbsp;=&nbsp;CSP&nbsp;hash
+<BR>&nbsp;&nbsp;<B>g</B>&nbsp;=&nbsp;ID&nbsp;of&nbsp;origin&nbsp;gbox&nbsp;peer
+<BR>&nbsp;&nbsp;<B>h</B>&nbsp;=&nbsp;checksum
+<BR>&nbsp;&nbsp;<B>i</B>&nbsp;=&nbsp;channel&nbsp;ID
+<BR>&nbsp;&nbsp;<B>j</B>&nbsp;=&nbsp;distance&nbsp;of&nbsp;gbox&nbsp;hops
+<BR>&nbsp;&nbsp;<B>l</B>&nbsp;=&nbsp;length
+<BR>&nbsp;&nbsp;<B>o</B>&nbsp;=&nbsp;ONID
+<BR>&nbsp;&nbsp;<B>p</B>&nbsp;=&nbsp;provider&nbsp;ID
+<BR>&nbsp;&nbsp;<B>s</B>&nbsp;=&nbsp;service&nbsp;ID
 <BR>&nbsp;&nbsp;<B>w</B>&nbsp;=&nbsp;CW
+<BR>&nbsp;&nbsp;<B>y</B>&nbsp;=&nbsp;payload
 <P>
 use a value as prefix to hide variable with this value, control characters will be escaped by &quot;\&quot;
 <P>
@@ -72,9 +95,9 @@ use a value as prefix to hide variable with this value, control characters will 
 
 <P>
 
-<B>loghistorysize</B> = <B>bytes</B>
+<B>loghistorylines</B> = <B>lines</B>
 <DL COMPACT><DT><DD>
-size of log message history in web interface or monitor, 0 = disabled, default:4096
+size of log message history in web interface or monitor, 0 = disabled, default:256
 </DL>
 
 <P>
@@ -172,7 +195,6 @@ define file saving NDS Videoguard mail messages from provider, default:none
 
 <B>enableled</B> = <B>0</B>|<B>1</B>|<B>2</B>
 <DL COMPACT><DT><DD>
-<P>
 <BR>&nbsp;<B>0</B>&nbsp;=&nbsp;LED&nbsp;support&nbsp;disabled&nbsp;(default)
 <BR>&nbsp;<B>1</B>&nbsp;=&nbsp;LED&nbsp;support&nbsp;enabled&nbsp;for&nbsp;routers
 <BR>&nbsp;<B>2</B>&nbsp;=&nbsp;LED&nbsp;support&nbsp;enabled&nbsp;for&nbsp;Qbox&nbsp;HD
@@ -196,7 +218,11 @@ additional delay in milli-seconds after waiting for local SCs on startup before 
 
 <B>preferlocalcards</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
-1 = try decoding on local cards first, default:0
+SC decoding behavior: 
+<P>
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;local&nbsp;SCs&nbsp;used&nbsp;like&nbsp;a&nbsp;remote&nbsp;reader
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;prefer&nbsp;cache&nbsp;exchange&nbsp;based&nbsp;SCs&nbsp;(default)
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;prefer&nbsp;local&nbsp;SCs
 </DL>
 
 <P>
@@ -252,6 +278,13 @@ time falling back to fallback reader, default:2500
 
 <P>
 
+<B>fallbacktimeout_percaid</B> = <B>milli-seconds</B>
+<DL COMPACT><DT><DD>
+time falling back to CAID restricted fallback reader, default:2500
+</DL>
+
+<P>
+
 <B>sleep</B> = <B>minutes</B>
 <DL COMPACT><DT><DD>
 time waiting for inactive users, default:none, can be overwritten per user in <B>oscam.user</B>
@@ -261,7 +294,7 @@ time waiting for inactive users, default:none, can be overwritten per user in <B
 
 <B>serverip</B> = <B>IP address</B>
 <DL COMPACT><DT><DD>
-bind service to specified IP address, default:all
+bind service to specified IP address, default:none
 </DL>
 
 <P>
@@ -333,6 +366,11 @@ mode for duplicate client connections (requirement: uniq &gt; 0):
 ECM will be send to two or more readers with the same SC and the CWs will be verified against each other for defined CAID or first two bytes of CAID, <B>lb_nbest_readers</B> must be set to 2 or higher, default:none
 </DL>
 
+<B>getblockemmauprovid</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = server overrides EMM blocking defined on client site, default:0
+</DL>
+
 <P>
 
 <B>lb_mode</B> = <B>mode</B>
@@ -377,16 +415,6 @@ set count of fallback readers for load balancing, default:1
 
 <P>
 
-<B>lb_reopen_mode</B> = <B>0</B>|<B>1</B>
-<DL COMPACT><DT><DD>
-load balancing reopen readers mode:
-<P>
-<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;standard&nbsp;late&nbsp;reopening&nbsp;of&nbsp;blocker&nbsp;readers&nbsp;(default)
-<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;fast&nbsp;reopening&nbsp;of&nbsp;blocker&nbsp;readers
-</DL>
-
-<P>
-
 <B>lb_nbest_percaid</B> = <B>CAID1:count1[,CAID2:count2]...</B>
 <DL COMPACT><DT><DD>
 set count of best readers per CAIDs for load balancing, wildcard CAIDs with two-digit CAIDs possible, default:none
@@ -418,9 +446,23 @@ time between retrying failed load balanced readers/CAIDs/providers/services, def
 
 <P>
 
+<B>lb_reopen_invalid</B> = <B>0</B>|<B>fB1</B>
+<DL COMPACT><DT><DD>
+0 = E_INVALID will be blocked until statistics has been cleaned, default:1
+</DL>
+
+<P>
+
+<B>lb_force_reopen_always</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = force reopening immediately all failing readers if no matching reader was found, default:0
+</DL>
+
+<P>
+
 <B>lb_retrylimit</B> = <B>milli-seconds</B>
 <DL COMPACT><DT><DD>
-retry next load balanced reader only if response time is higher then lb_retrylimit, default:800
+retry next load balanced reader only if response time is higher then lb_retrylimit, default:0
 </DL>
 
 <P>
@@ -568,7 +610,7 @@ monitor level:
 <BR>&nbsp;<B>3</B>&nbsp;=&nbsp;all&nbsp;procs,&nbsp;reload&nbsp;of&nbsp;<B>oscam.user</B>&nbsp;possible
 <BR>&nbsp;<B>4</B>&nbsp;=&nbsp;complete&nbsp;access
 <P>
-monlevel can be overwritten per user in <B>oscam.user</B>
+monlevel can be overwritten per user in <B>oscam.user</B>.
 </DL>
 
 <P>
@@ -577,8 +619,6 @@ monlevel can be overwritten per user in <B>oscam.user</B>
 <DL COMPACT><DT><DD>
 time to hide clients in the monitor if not sending requests, 0 = disabled, default:25
 </DL>
-
-<P>
 
 <A NAME="lbAG">&nbsp;</A>
 <H3>The [webif] section</H3>
@@ -678,6 +718,24 @@ status refresh in seconds, default:none
 
 <P>
 
+<B>httphidetype</B> = <B>type</B>[<B>type</B>]...
+<DL COMPACT><DT><DD>
+characters defining columns to hide in web interface status page (see type 
+column), default:none
+<P>
+<BR>&nbsp;types:
+<P>
+<BR>&nbsp;'c':&nbsp;client
+<BR>&nbsp;'h':&nbsp;http
+<BR>&nbsp;'m':&nbsp;monitor
+<BR>&nbsp;'p':&nbsp;proxy
+<BR>&nbsp;'r':&nbsp;reader
+<BR>&nbsp;'s':&nbsp;server
+<BR>&nbsp;'x':&nbsp;cache&nbsp;exchange
+</DL>
+
+<P>
+
 <B>httpscript</B> = <B>path</B>
 <DL COMPACT><DT><DD>
 path to an executable script which you wish to start from web interface, default:none
@@ -687,7 +745,8 @@ path to an executable script which you wish to start from web interface, default
 
 <B>httpallowed</B> = <B>IP address</B>|<B>IP address range</B>[,<B>IP address</B>|<B>IP address range]</B>...
 <DL COMPACT><DT><DD>
-http web interface connections allowed, default:none
+http web interface connections allowed, default:127.0.0.1,192.168.0.0-192.168.255.255,10.0.0.0-10.255.255.255,::1
+<BR>&nbsp;
 <BR>&nbsp;example:&nbsp;httpallowed&nbsp;=&nbsp;127.0.0.1,192.168.0.0-192.168.255.255
 </DL>
 
@@ -696,6 +755,7 @@ http web interface connections allowed, default:none
 <B>httpdyndns</B> = <B>hostname[,hostname][,hostname]</B>
 <DL COMPACT><DT><DD>
 http web interface connections allowed, default:none
+<BR>&nbsp;
 <BR>&nbsp;example:&nbsp;httpdyndns&nbsp;=&nbsp;host.example.com
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpdyndns&nbsp;=&nbsp;host1.example.com,host2.example.com
 </DL>
@@ -714,6 +774,13 @@ write config:
 
 <P>
 
+<B>httpoverwritebakfile</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = overwrite backup configuration files, default:0
+</DL>
+
+<P>
+
 <B>httpreadonly</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
 1 = read only modus for web interface, default:0
@@ -728,14 +795,35 @@ write config:
 
 <P>
 
+<B>httppiconpath</B> = <B>path</B>
+<DL COMPACT><DT><DD>
+path to picons, default:none
+</DL>
+
+<P>
+
 <B>httphelplang</B> = <B>en</B>|<B>de</B>|<B>fr</B>|<B>&lt;available wiki languages&gt;</B>
 <DL COMPACT><DT><DD>
 set right language for wiki entry point, default:en
 </DL>
 
+<P>
+
+<B>httplocale</B> = <B>environment</B>
+<DL COMPACT><DT><DD>
+set the locale environment, default:none
+</DL>
+
 <A NAME="lbAH">&nbsp;</A>
 <H3>The [lcd] section</H3>
 
+
+<P>
+
+<B>httposcamlabel</B> = <B>text</B>
+<DL COMPACT><DT><DD>
+set individual label in web interface header, default:OSCam
+</DL>
 
 <P>
 
@@ -777,19 +865,19 @@ value to delay cached requests, default:0
 
 <B>max_time</B> = <B>seconds</B>
 <DL COMPACT><DT><DD>
-maximum time CWs resist in cache after 1st client request, the time must be 2 seconds highter than the parameter <B>clienttimeout</B>, default:15
+maximum time CWs resist in cache, the time must be 2 seconds highter than the parameter <B>clienttimeout</B>, default:15
 </DL>
 
 <P>
 
-<B>max_count</B> = <B>count</B>
+<B>max_hit_time</B> = <B>seconds</B>
 <DL COMPACT><DT><DD>
-maximum CWs in cache, default:1000
+maximum time for cache exchange hits resist in cache for evaluating <B>wait_time</B>, default:15
 </DL>
 
 <P>
 
-<B>wait_time</B> = <B>[caid][&amp;mask][@provid][$servid][:awtime][:]dwtime,n</B>
+<B>wait_time</B> = <B>[caid][&amp;mask][@provid][$servid][:awtime][:]dwtime[,[caid][&amp;mask][@provid][$servid][:awtime][:]dwtime]...</B>
 <DL COMPACT><DT><DD>
 wait time in milli-seconds for cache exchange and Cardservproxy before sending ECMs to reader or proxy, default:none
 <P>
@@ -807,21 +895,44 @@ wait time in milli-seconds for cache exchange and Cardservproxy before sending E
 
 <P>
 
+<B>cacheex_cw_check</B> = <B>[caid][&amp;mask][@provid][$servid]:mode:counter[,[caid][&amp;mask][@provid][$servid]:mode:counter]...</B>
+<DL COMPACT><DT><DD>
+<P>
+<BR>&nbsp;<B>mode</B>&nbsp;=&nbsp;specify&nbsp;behaviour&nbsp;for&nbsp;counter:
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>0</B>&nbsp;=&nbsp;when&nbsp;<B>wait_time</B>&nbsp;expires,&nbsp;serve&nbsp;highest&nbsp;counter's&nbsp;CW&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;got&nbsp;anyway,&nbsp;even&nbsp;if&nbsp;no&nbsp;counter&nbsp;reached&nbsp;(default)
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>1</B>&nbsp;=&nbsp;never&nbsp;serve&nbsp;CW&nbsp;from&nbsp;cache&nbsp;exchange&nbsp;stored&nbsp;in&nbsp;cache,&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;it's&nbsp;counter&nbsp;not&nbsp;reaches&nbsp;counter.&nbsp;When&nbsp;<B>wait_time</B>&nbsp;
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expires,&nbsp;requests&nbsp;will&nbsp;go&nbsp;to&nbsp;normal&nbsp;readers
+<BR>&nbsp;
+<BR>&nbsp;<B>counter</B>&nbsp;=&nbsp;set&nbsp;minimum&nbsp;CW&nbsp;counter&nbsp;to&nbsp;allow&nbsp;CW&nbsp;is&nbsp;used,&nbsp;default:1
+</DL>
+
+<P>
+
+<B>cacheex_mode1_delay</B> = <B>CAID1:time,[BCAID2:time]...</B>
+<DL COMPACT><DT><DD>
+delay in milli-seconds for asking cache exchange mode 1 readers, default:none
+</DL>
+
+<P>
+
 <B>csp_port</B> = <B>port</B>
 <DL COMPACT><DT><DD>
-TCP port of Cardservproxy for cache exchange, default:none
+UDP port of Cardservproxy for cache exchange, default:none
 </DL>
 
 <P>
 
 <B>csp_serverip</B> = <B>IP</B>
 <DL COMPACT><DT><DD>
-IP address of Cardservproxy for cache exchange, default:none
+bind Cardservproxy for cache exchange to specified IP address, default:none
 </DL>
 
 <P>
 
-<B>csp_ecm_filter</B> = <B>[caid][&amp;mask][@provid][$servid],n</B>
+<B>csp_ecm_filter</B> = <B>[caid][&amp;mask][@provid][$servid][,[caid][&amp;mask][@provid][$servid]]...</B>
 <DL COMPACT><DT><DD>
 Cardservproxy incoming ECM filter setting, default:none
 </DL>
@@ -831,6 +942,13 @@ Cardservproxy incoming ECM filter setting, default:none
 <B>csp_allow_request</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
 allow incoming ECM request from Cardservproxy, default:1
+</DL>
+
+<P>
+
+<B>csp_allow_reforward</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = reforward other cacheex updates to Cardservproxy peers, <I>option could cause loops</I>, default:0
 </DL>
 
 <P>
@@ -858,21 +976,21 @@ maximum CW cycle list entries, default:500, maximum:4000
 
 <B>cwcycle_keeptime</B> = <B>minutes</B>
 <DL COMPACT><DT><DD>
-minimum time a learned cycle time resists in memory, default:0, maximum:15
+minimum time a learned cycle time resists in memory, default:15, maximum:15
 </DL>
 
 <P>
 
 <B>cwcycle_onbad</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
-0 = log bad CW cycle only, 1 = drop bad CW cycle, default:0
+0 = log bad CW cycle only, 1 = drop bad CW cycle, default:1
 </DL>
 
 <P>
 
 <B>cwcycle_dropold</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
-1= drop old CW cycle, default:0
+1= drop old CW cycle, default:1
 </DL>
 
 <P>
@@ -881,10 +999,34 @@ minimum time a learned cycle time resists in memory, default:0, maximum:15
 <DL COMPACT><DT><DD>
 drop CW mode:
 <P>
-<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;disabled&nbsp;(default)
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;disabled
 <BR>&nbsp;<B>2</B>&nbsp;=&nbsp;2&nbsp;(or&nbsp;more)&nbsp;same&nbsp;bytes&nbsp;and&nbsp;drop&nbsp;new&nbsp;CW
 <BR>&nbsp;<B>3</B>&nbsp;=&nbsp;3&nbsp;(or&nbsp;more)&nbsp;same&nbsp;bytes&nbsp;and&nbsp;drop&nbsp;new&nbsp;CW
-<BR>&nbsp;<B>4</B>&nbsp;=&nbsp;4&nbsp;(or&nbsp;more)&nbsp;same&nbsp;bytes&nbsp;and&nbsp;drop&nbsp;new&nbsp;CW
+<BR>&nbsp;<B>4</B>&nbsp;=&nbsp;4&nbsp;(or&nbsp;more)&nbsp;same&nbsp;bytes&nbsp;and&nbsp;drop&nbsp;new&nbsp;CW&nbsp;(default)
+</DL>
+
+<P>
+
+<B>cwcycle_allowbadfromffb</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = allow bad cycles from a fixed fallback reader, default:0
+</DL>
+
+<P>
+
+<B>cwcycle_usecwcfromce</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = use CW info from cache exchange, default:0
+</DL>
+
+<P>
+
+<B>wait_until_ctimeout</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+answer when cache exchange timeout expires, if no normal readers are available for sending ECMs:
+<P>
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;immediately&nbsp;send&nbsp;'not&nbsp;found'&nbsp;to&nbsp;client&nbsp;(default)
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;wait&nbsp;for&nbsp;cache&nbsp;exchange&nbsp;answer&nbsp;until&nbsp;client&nbsp;timeout&nbsp;expires
 </DL>
 
 <A NAME="lbAJ">&nbsp;</A>
@@ -973,6 +1115,13 @@ bind service to specified IP address, default:all
 
 <P>
 
+<B>keepalive</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+0 = disable camd 3.78x keepalive modus, default:0
+</DL>
+
+<P>
+
 <B>suppresscmd08</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
 0 = tell camd 3.78x clients not to request again for rejected CAID, service ID and provider ID combination, 1 = disable, can be overwritten per user in <B>oscam.user</B>, default:0
@@ -1014,7 +1163,7 @@ bind newcamd service to specified IP address, default:all
 <DL COMPACT><DT><DD>
 newcamd client connections allowed from, default:none
 <P>
-<BR>&nbsp;example:&nbsp;allowed&nbsp;=&nbsp;127.0.0.1,192.168.0.0-192.168.255.255
+<BR>&nbsp;example:&nbsp;allowed&nbsp;=&nbsp;127.0.0.1,192.168.0.0-192.168.255.255,::1
 </DL>
 
 <P>
@@ -1075,17 +1224,21 @@ user name for radegast client
 <P>
 parameters:
 <BR>&nbsp;<B>user</B>&nbsp;&nbsp;&nbsp;=&nbsp;<B>account</B>
-<BR>&nbsp;<B>device</B>&nbsp;=&nbsp;<B>serial&nbsp;device&nbsp;name</B>
+<BR>&nbsp;<B>device</B>&nbsp;=&nbsp;<B>serial&nbsp;device&nbsp;name</B>|<B>hostname|IP</B>,<B>port</B>
+<BR>&nbsp;<B>baud</B>&nbsp;&nbsp;&nbsp;=&nbsp;<B>serial&nbsp;port&nbsp;speed</B>&nbsp;(for&nbsp;serial&nbsp;devices&nbsp;only)
 <BR>&nbsp;<B>option</B>&nbsp;=&nbsp;<B>timeout</B>&nbsp;=&nbsp;milli-seconds,&nbsp;timeout&nbsp;for&nbsp;connection,&nbsp;
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default:50
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<B>delay</B>&nbsp;&nbsp;&nbsp;=&nbsp;milli-seconds,&nbsp;additional&nbsp;delay&nbsp;between&nbsp;two
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;characters,&nbsp;default:0
 <P>
-supported serial devices:
+supported serial devices (autodection):
 <BR>&nbsp;HSIC&nbsp;&nbsp;&nbsp;&nbsp;(humax&nbsp;sharing&nbsp;interface&nbsp;client)
 <BR>&nbsp;SSSP&nbsp;&nbsp;&nbsp;&nbsp;(simple&nbsp;serial&nbsp;sharing&nbsp;protocol)
 <BR>&nbsp;bomba&nbsp;&nbsp;&nbsp;(BOMBA&nbsp;firmware)
 <BR>&nbsp;dsr9500&nbsp;(DSR&nbsp;9500)
+<BR>&nbsp;
+<BR>&nbsp;example:&nbsp;user1@/dev/ttyS1:115200?delay=1&amp;timeout=5000
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<A HREF="mailto:user2@192.160.0.1">user2@192.160.0.1</A>,12345?delay=1&amp;timeout=5000
 </DL>
 
 <A NAME="lbAP">&nbsp;</A>
@@ -1113,9 +1266,9 @@ define CCcam version, <I>minimum CCcam version 2.0.11</I>, used with original CC
 <DL COMPACT><DT><DD>
 reshare level for CCcam clients (default:10):
 <P>
-<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;no&nbsp;resharing
-<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;resharing&nbsp;for&nbsp;direct&nbsp;peer&nbsp;only
-<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;resharing&nbsp;for&nbsp;direct&nbsp;peer&nbsp;and&nbsp;next&nbsp;level
+<B>-1</B> = no resharing
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;resharing&nbsp;for&nbsp;direct&nbsp;peer&nbsp;only
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;resharing&nbsp;for&nbsp;direct&nbsp;peer&nbsp;and&nbsp;next&nbsp;level
 <BR>&nbsp;<B>x</B>&nbsp;=&nbsp;resharing&nbsp;for&nbsp;direct&nbsp;peer&nbsp;and&nbsp;next&nbsp;x&nbsp;level
 </DL>
 
@@ -1126,11 +1279,11 @@ reshare level for CCcam clients (default:10):
 CCcam reshare mode:
 <P>
 <BR>&nbsp;<B>0</B>&nbsp;=&nbsp;reader&nbsp;reshares&nbsp;only&nbsp;received&nbsp;SCs&nbsp;for&nbsp;CCcam&nbsp;readers,&nbsp;
-<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;defined&nbsp;filters/CAIDs/provids&nbsp;on&nbsp;other&nbsp;readers&nbsp;(default)
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;defined&nbsp;filters/CAIDs/provids&nbsp;on&nbsp;other&nbsp;readers
 <BR>&nbsp;<B>1</B>&nbsp;=&nbsp;reader&nbsp;reshares&nbsp;received&nbsp;SCs&nbsp;(like=0)&nbsp;and&nbsp;defined&nbsp;services
 <BR>&nbsp;<B>2</B>&nbsp;=&nbsp;reader&nbsp;reshares&nbsp;only&nbsp;defined&nbsp;reader&nbsp;services&nbsp;as&nbsp;virtual&nbsp;SCs
 <BR>&nbsp;<B>3</B>&nbsp;=&nbsp;reader&nbsp;reshares&nbsp;only&nbsp;defined&nbsp;user&nbsp;services&nbsp;as&nbsp;virtual&nbsp;SCs
-<BR>&nbsp;<B>4</B>&nbsp;=&nbsp;reader&nbsp;reshares&nbsp;only&nbsp;received&nbsp;SCs
+<BR>&nbsp;<B>4</B>&nbsp;=&nbsp;reader&nbsp;reshares&nbsp;only&nbsp;received&nbsp;SCs&nbsp;(default)
 <P>
 Every server is shared as hop = 0 and with defined reshare values.
 <P>
@@ -1229,9 +1382,51 @@ set CCcam node ID in hex, default:none
 
 <P>
 
-<B>gbox_hostname</B> = <B>hostname</B>| <B>IP address</B>
+<B>hostname</B> = <B>hostname</B>| <B>IP address</B>
 <DL COMPACT><DT><DD>
 set hostname or IP address for gbox protocol, default:none
+</DL>
+
+<P>
+
+<B>port</B> = <B>port</B>[,<B>port</B>]...
+<DL COMPACT><DT><DD>
+UDP port for gbox server, default:0
+</DL>
+
+<P>
+
+<B>my_password</B> = <B>password</B>
+<DL COMPACT><DT><DD>
+password for connection to local gbox peer, default:none
+</DL>
+
+<P>
+
+<B>proxy_card</B> = <B>&lt;CAID&gt;&lt;provid&gt;[,&lt;CAID&gt;&lt;provid&gt;]...</B>
+<DL COMPACT><DT><DD>
+proxy reader SCs to be reshared into gbox network, default:none
+</DL>
+
+<P>
+
+<B>ccc_reshare</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = enable CCCam reshare, default:0
+</DL>
+
+<P>
+
+<B>my_vers</B> = <B>version</B>
+<DL COMPACT><DT><DD>
+set gbox version in hexadecimal low byte, default:25
+</DL>
+
+<P>
+
+<B>my_cpu_api</B> = <B>byte</B>
+<DL COMPACT><DT><DD>
+set gbox CPU and API byte in hexadecimal, default:40
 </DL>
 
 <P>
@@ -1243,12 +1438,34 @@ send message to peers in seconds, default:300
 
 <P>
 
-<B>gbox_local_cards</B> = <B>&lt;local card 1&gt;</B>[,<B>&lt;local card 2&gt;</B>]...
+<B>gsms_disable</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
-list of local cards presented to peers, (maximum see CS_GBOX_MAX_LOCAL_CARDS in globals.h), default:none
+1 = disable gbox short message service (GSMS),default:0
+<P>
+sending a messeage: /tmp/gsms.txt: &lt;box ID&gt; &lt;1=mormal message|2=OSD/TV message&gt; 
+&lt;message 6 to 127 characters&gt;, status will be stored in '/tmp/gsms.ack' 
+respective 'gsms.nack', receiving a message: The message will be stored in 
+/tmp/gsms.log 
+</DL>
+
+<P>
+
+<B>tmp_dir</B> = <B>path</B>
+<DL COMPACT><DT><DD>
+temporary directory for gbox, default:/tmp/.oscam
 </DL>
 
 <A NAME="lbAR">&nbsp;</A>
+<H3>The [scam] section</H3>
+
+<P>
+
+<B>port</B> = <B>port</B>
+<DL COMPACT><DT><DD>
+UDP port for scam server, default:0
+</DL>
+
+<A NAME="lbAS">&nbsp;</A>
 <H3>The [dvbapi] section</H3>
 
 <P>
@@ -1258,6 +1475,13 @@ list of local cards presented to peers, (maximum see CS_GBOX_MAX_LOCAL_CARDS in 
 1 = DVB API enabled, default:0
 <P>
 Create file /tmp/.pauseoscam to pause DVB API, e.g. if STB goes into standby and OSCam remains as SC server only.
+</DL>
+
+<P>
+
+<B>listen_port</B> = <B>0</B>|<B>port</B>
+<DL COMPACT><DT><DD>
+TCP/IP port for SAT IP clients, filtering has to be done on client site, 0 = disabled, default:0
 </DL>
 
 <P>
@@ -1315,6 +1539,20 @@ PMT mode:
 
 <P>
 
+<B>ecminfo_type</B> = <B>0</B>|<B>1</B>|<B>2</B>|<B>3</B>|<B>4</B>|<B>5</B>
+<DL COMPACT><DT><DD>
+ecm.info types:
+<P>
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;OSCam&nbsp;syntax&nbsp;(default)
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;OSCam&nbsp;syntax&nbsp;with&nbsp;ECM&nbsp;time&nbsp;in&nbsp;ms&nbsp;instead&nbsp;of&nbsp;seconds
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;WiCardd
+<BR>&nbsp;<B>3</B>&nbsp;=&nbsp;mgcamd
+<BR>&nbsp;<B>4</B>&nbsp;=&nbsp;CCcam
+<BR>&nbsp;<B>5</B>&nbsp;=&nbsp;camd3
+</DL>
+
+<P>
+
 <B>request_mode</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
 CAID request mode:
@@ -1325,7 +1563,7 @@ CAID request mode:
 
 <P>
 
-<B>boxtype</B> = <B>dbox2</B>|<B>dreambox</B>|<B>dm7000</B>|<B>duckbox</B>|<B>ufs910</B>|<B>ipbox</B>|<B>ipbox-pmt</B>|<B>qboxhd</B>|<B>coolstream</B>|<B>neumo</B>|<B>pc</B>
+<B>boxtype</B> = <B>dbox2</B>|<B>dreambox</B>|<B>dm7000</B>|<B>duckbox</B>|<B>ufs910</B>|<B>ipbox</B>|<B>ipbox-pmt</B>|<B>qboxhd</B>|<B>coolstream</B>|<B>neumo</B>|<B>samygo</B>|<B>pc</B>
 <DL COMPACT><DT><DD>
 set boxtype, auto detection of DVB API will be aspired, default:dreambox
 <P>
@@ -1336,6 +1574,27 @@ ipbox-pmt can be used on any DGS based images (with or without camd.socket suppo
 verified on HD models only
 <P>
 pc is for generic pc support (currently supported on VDR with vdr-plugin-dvbapi)
+</DL>
+
+<P>
+
+<B>read_sdt</B> = <B>0</B>|<B>1</B>|<B>2</B>
+<DL COMPACT><DT><DD>
+mode of provider, channel name and service type auto detection via SDT:
+<P>
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;disabled&nbsp;(default)
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;enabled&nbsp;for&nbsp;non&nbsp;FTA&nbsp;channels&nbsp;only
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;enabled&nbsp;for&nbsp;all&nbsp;channels
+</DL>
+
+<P>
+
+<B>write_sdt_prov</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+mode writing provider name into <B>oscam.srvid2</B> file:
+<P>
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;disabled&nbsp;(default)
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;enabled
 </DL>
 
 <P>
@@ -1359,21 +1618,14 @@ minimum time to write CW, default:0
 1 = reopen demux devices on each channel switching, default:0
 </DL>
 
-<P>
-
-<B>decodeforever</B> =  <B>0</B>|<B>1</B>
-<DL COMPACT><DT><DD>
-1 = trying to decode on all CAIDs infinitely, default:0
-</DL>
-
-<A NAME="lbAS">&nbsp;</A>
+<A NAME="lbAT">&nbsp;</A>
 <H3>The [anticasc] section</H3>
 
 <P>
 
 <B>enabled</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
-1 = enabled anti-cascading, default:0
+1 = enable anti-cascading, default:0
 </DL>
 
 <P>
@@ -1399,16 +1651,16 @@ quantity of samples over limit, default:10
 
 <P>
 
-<B>penalty</B> = <B>0</B>|<B>1</B>|<B>2</B>
+<B>penalty</B> = <B>0</B>|<B>1</B>|<B>2</B>|<B>3</B>
 <DL COMPACT><DT><DD>
 level of penalty:
 <P>
 <BR>&nbsp;<B>0</B>&nbsp;=&nbsp;only&nbsp;logging&nbsp;(default)
 <BR>&nbsp;<B>1</B>&nbsp;=&nbsp;send&nbsp;fake&nbsp;CWs
-<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;disbable&nbsp;user&nbsp;temporary
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;temporary&nbsp;user&nbsp;ban
 <BR>&nbsp;<B>3</B>&nbsp;=&nbsp;send&nbsp;delayed&nbsp;CWs
 <P>
-penalty can be overwritten per user in <B>oscam.user</B>
+penalty can be overwritten per user in <B>oscam.user</B>.
 </DL>
 
 <P>
@@ -1432,7 +1684,64 @@ fake delay time, default:1000, minimum value is 100, maximum value is 3000
 how many samples should be penalized, default:8
 </DL>
 
-<A NAME="lbAT">&nbsp;</A>
+<P>
+
+<B>acosc_enabled</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = enable anti-cascading over SID count, default:0
+</DL>
+
+<P>
+
+<B>acosc_max_active_sids</B> = <B>count</B>
+<DL COMPACT><DT><DD>
+maximum active SIDs with anti-cascading over SID, 0 = unlimited, default:0
+<P>
+Can be overwritten per user in <B>oscam.user</B>.
+</DL>
+
+<P>
+
+<B>acosc_zap_limit</B> = <B>count</B>
+<DL COMPACT><DT><DD>
+zap limit for anti-cascading over SID, 0 = unlimited, default:0
+<P>
+Can be overwritten per user in <B>oscam.user</B>.
+</DL>
+
+<P>
+
+<B>acosc_penalty</B> = <B>0</B>|<B>1</B>|<B>2</B>|<B>3</B>
+<DL COMPACT><DT><DD>
+level of penalty with anti-cascading over SID count:
+<P>
+<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;only&nbsp;logging&nbsp;(default)
+<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;send&nbsp;fake&nbsp;CWs
+<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;temporary&nbsp;user&nbsp;ban
+<BR>&nbsp;<B>3</B>&nbsp;=&nbsp;send&nbsp;delayed&nbsp;CWs
+<P>
+Can be overwritten per user in <B>oscam.user</B>.
+</DL>
+
+<P>
+
+<B>acosc_penalty_duration</B> = <B>seconds</B>
+<DL COMPACT><DT><DD>
+penalty duration for anti-cascading over SID count, default:0
+<P>
+Can be overwritten per user in <B>oscam.user</B>.
+</DL>
+
+<P>
+
+<B>acosc_delay</B> = <B>milli-seconds</B>
+<DL COMPACT><DT><DD>
+delay for anti-cascading over SID count, default:0
+<P>
+Can be overwritten per user in <B>oscam.user</B>.
+</DL>
+
+<A NAME="lbAU">&nbsp;</A>
 <H2>LOGGING</H2>
 
 <DL COMPACT>
@@ -1448,7 +1757,7 @@ logging format
 <P>
 <BR>&nbsp;stage/used/chosen/possible
 </DL>
-<A NAME="lbAU">&nbsp;</A>
+<A NAME="lbAV">&nbsp;</A>
 <H2>MONITOR</H2>
 
 <P>
@@ -1548,7 +1857,7 @@ show OSCam version
 <P>
 show all valid monitor commands
 </DL>
-<A NAME="lbAV">&nbsp;</A>
+<A NAME="lbAW">&nbsp;</A>
 <H2>WEB INTERFACE</H2>
 
 <DL COMPACT>
@@ -1560,7 +1869,7 @@ own template request the orignal template with the non-linked page
 <B>savetemplates.html</B>. Store your own template in the directory specified 
 by <B>httptpl</B>. 
 </DL>
-<A NAME="lbAW">&nbsp;</A>
+<A NAME="lbAX">&nbsp;</A>
 <H2>CACHING</H2>
 
 types of ECM caching:
@@ -1574,10 +1883,10 @@ ECM and CW in cache already.
 <P>
 ECM and checksum in cache already.
 </DL>
-<A NAME="lbAX">&nbsp;</A>
+<A NAME="lbAY">&nbsp;</A>
 <H2>SEE ALSO</H2>
 
-<B><A HREF="/cgi-bin/man/man2html?1+list_smargo">list_smargo</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?1+oscam">oscam</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ac">oscam.ac</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cacheex">oscam.cacheex</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cert">oscam.cert</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.dvbapi">oscam.dvbapi</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.guess">oscam.guess</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ird">oscam.ird</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.provid">oscam.provid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.server">oscam.server</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.services">oscam.services</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.srvid">oscam.srvid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.tiers">oscam.tiers</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.user">oscam.user</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.whitelist">oscam.whitelist</A></B>(5)
+<B><A HREF="/cgi-bin/man/man2html?1+list_smargo">list_smargo</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?1+oscam">oscam</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ac">oscam.ac</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cacheex">oscam.cacheex</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cert">oscam.cert</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.dvbapi">oscam.dvbapi</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.fakecws">oscam.fakecws</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.guess">oscam.guess</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ird">oscam.ird</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.provid">oscam.provid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ratelimit">oscam.ratelimit</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.server">oscam.server</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.services">oscam.services</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.srvid">oscam.srvid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.srvid2">oscam.srvid2</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.tiers">oscam.tiers</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.user">oscam.user</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.whitelist">oscam.whitelist</A></B>(5)
 <P>
 
 <HR>
@@ -1600,14 +1909,15 @@ ECM and checksum in cache already.
 <DT><A HREF="#lbAO">The [serial] section</A><DD>
 <DT><A HREF="#lbAP">The [cccam] section</A><DD>
 <DT><A HREF="#lbAQ">The [gbox] section</A><DD>
-<DT><A HREF="#lbAR">The [dvbapi] section</A><DD>
-<DT><A HREF="#lbAS">The [anticasc] section</A><DD>
+<DT><A HREF="#lbAR">The [scam] section</A><DD>
+<DT><A HREF="#lbAS">The [dvbapi] section</A><DD>
+<DT><A HREF="#lbAT">The [anticasc] section</A><DD>
 </DL>
-<DT><A HREF="#lbAT">LOGGING</A><DD>
-<DT><A HREF="#lbAU">MONITOR</A><DD>
-<DT><A HREF="#lbAV">WEB INTERFACE</A><DD>
-<DT><A HREF="#lbAW">CACHING</A><DD>
-<DT><A HREF="#lbAX">SEE ALSO</A><DD>
+<DT><A HREF="#lbAU">LOGGING</A><DD>
+<DT><A HREF="#lbAV">MONITOR</A><DD>
+<DT><A HREF="#lbAW">WEB INTERFACE</A><DD>
+<DT><A HREF="#lbAX">CACHING</A><DD>
+<DT><A HREF="#lbAY">SEE ALSO</A><DD>
 </DL>
 </BODY>
 </HTML>

@@ -1,3 +1,5 @@
-			<TR><TD>##TPLHELPPREFIX##server#user##TPLHELPSUFFIX##User:</A></TD><TD><input name="user" type="text" size="30" maxlength="50" value="##ACCOUNT##"></TD></TR>
-			<TR><TD>##TPLHELPPREFIX##server#password##TPLHELPSUFFIX##Password:</A></TD><TD><input name="password" type="text" size="30" maxlength="50" value="##PASSWORD##"></TD></TR>
-			<TR><TD>##TPLHELPPREFIX##server#inactivitytimeout##TPLHELPSUFFIX##Inactivity timeout:</A></TD><TD><input name="inactivitytimeout" type="text" size="30" maxlength="50" value="##INACTIVITYTIMEOUT##">s</TD></TR>
+			<TR><TD><A>User:</A></TD><TD><input name="user" class="longer" type="text" maxlength="50" value="##USERNAME##"></TD></TR>
+			<TR><TD><A>Password:</A></TD><TD><input name="password" class="longer" type="text" maxlength="50" value="##PASSWORD##"></TD></TR>
+			<TR><TD><A>Inactivity timeout:</A></TD><TD><input name="inactivitytimeout" class="withunit short" type="text" maxlength="5" value="##INACTIVITYTIMEOUT##"> s default 0</TD></TR>
+			<TR><TD><A>Reconnect timeout:</A></TD><TD><input name="reconnecttimeout" class="withunit short" type="text" maxlength="5" value="##RECEIVETIMEOUT##"> s</TD></TR>
+			<TR><TD><A>Keepalive:</A><input name="keepalive" type="hidden" value="0"></TD><TD><input name="keepalive" type="checkbox" value="1" ##RDRKEEPALIVE##><label></label></TD></TR>

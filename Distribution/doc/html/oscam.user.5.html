@@ -81,6 +81,13 @@ account enabled from hh:mm to hh:mm, default:none
 
 <P>
 
+<B>max_connections</B> = <B>count</B>
+<DL COMPACT><DT><DD>
+maximum allowed connections per user when unique level will be adducted, default:1
+</DL>
+
+<P>
+
 <B>uniq</B> = <B>0</B>|<B>1</B>|<B>2</B>|<B>4</B>
 <DL COMPACT><DT><DD>
 unique level:
@@ -92,26 +99,27 @@ unique level:
 <BR>&nbsp;<B>3</B>&nbsp;=&nbsp;only&nbsp;one&nbsp;connection&nbsp;per&nbsp;user,&nbsp;but&nbsp;only&nbsp;the&nbsp;last&nbsp;login&nbsp;
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;will&nbsp;survive&nbsp;(old&nbsp;MpCS&nbsp;behavior)
 <BR>&nbsp;<B>4</B>&nbsp;=&nbsp;set&nbsp;user&nbsp;only&nbsp;to&nbsp;fake&nbsp;if&nbsp;source&nbsp;ip&nbsp;is&nbsp;different,&nbsp;
-<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;but&nbsp;only&nbsp;the&nbsp;last&nbsp;login&nbsp;will&nbsp;survive
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;but&nbsp;only&nbsp;the&nbsp;last&nbsp;login&nbsp;will&nbsp;survive&nbsp;
 </DL>
 
 <P>
 
 <B>numusers</B> = <B>quantity</B>
 <DL COMPACT><DT><DD>
-anti-cascading: user per account, 0 = anti-cascading disabled, default:0
+anti-cascading: user per account, 0 = anti-cascading disabled, -1 = global value from oscam.conf, default:-1
 </DL>
 
 <P>
 
 <B>penalty</B> = <B>0</B>|<B>1</B>|<B>2</B>
 <DL COMPACT><DT><DD>
-level of penalty, default: level of oscam.conf:
+level of penalty:
 <P>
-<BR>&nbsp;<B>0</B>&nbsp;=&nbsp;only&nbsp;logging
-<BR>&nbsp;<B>1</B>&nbsp;=&nbsp;send&nbsp;fake&nbsp;CWs
-<BR>&nbsp;<B>2</B>&nbsp;=&nbsp;disbable&nbsp;user&nbsp;temporary
-<BR>&nbsp;<B>3</B>&nbsp;=&nbsp;send&nbsp;delayed&nbsp;CWs
+<BR>&nbsp;<B>-1</B>&nbsp;=&nbsp;level&nbsp;of&nbsp;oscam.conf&nbsp;(default)
+<BR>&nbsp;<B>&nbsp;0</B>&nbsp;=&nbsp;only&nbsp;logging
+<BR>&nbsp;<B>&nbsp;1</B>&nbsp;=&nbsp;send&nbsp;fake&nbsp;CWs
+<BR>&nbsp;<B>&nbsp;2</B>&nbsp;=&nbsp;temporary&nbsp;user&nbsp;ban
+<BR>&nbsp;<B>&nbsp;3</B>&nbsp;=&nbsp;send&nbsp;delayed&nbsp;CWs
 </DL>
 
 <P>
@@ -126,6 +134,47 @@ set fake delay time individually for user:
 
 <P>
 
+<B>acosc_max_active_sids</B> = <B>count</B>
+<DL COMPACT><DT><DD>
+maximum active SIDs with anti-cascading over SID, 0 = unlimited, -1 = use global setting, default:0
+</DL>
+
+<P>
+
+<B>acosc_zap_limit</B> = <B>count</B>
+<DL COMPACT><DT><DD>
+zap limit for anti-cascading over SID, 0 = unlimited, -1 = use global setting, default:0
+</DL>
+
+<P>
+
+<B>acosc_penalty</B> = <B>0</B>|<B>1</B>|<B>2</B>|<B>3</B>|<B>-1</B>
+<DL COMPACT><DT><DD>
+level of penalty with anti-cascading over SID count:
+<P>
+<BR>&nbsp;&nbsp;<B>0</B>&nbsp;=&nbsp;only&nbsp;logging&nbsp;(default)
+<BR>&nbsp;&nbsp;<B>1</B>&nbsp;=&nbsp;send&nbsp;fake&nbsp;CWs
+<BR>&nbsp;&nbsp;<B>2</B>&nbsp;=&nbsp;temporary&nbsp;user&nbsp;ban
+<BR>&nbsp;&nbsp;<B>3</B>&nbsp;=&nbsp;send&nbsp;delayed&nbsp;CWs
+<BR>&nbsp;<B>-1</B>&nbsp;=&nbsp;use&nbsp;global&nbsp;setting
+</DL>
+
+<P>
+
+<B>acosc_penalty_duration</B> = <B>seconds</B>
+<DL COMPACT><DT><DD>
+penalty duration for anti-cascading over SID count, -1 = use global setting, default:0
+</DL>
+
+<P>
+
+<B>acosc_delay</B> = <B>milli-seconds</B>
+<DL COMPACT><DT><DD>
+delay for anti-cascading over SID count, -1 = use global setting, default:0
+</DL>
+
+<P>
+
 <B>failban</B> = <B>0</B>|<B>2</B>|<B>4</B>|<B>8</B>
 <DL COMPACT><DT><DD>
 mask for IP address based blocking:
@@ -134,6 +183,49 @@ mask for IP address based blocking:
 <BR>&nbsp;<B>2</B>&nbsp;=&nbsp;block&nbsp;IP&nbsp;address&nbsp;of&nbsp;a&nbsp;disabled&nbsp;account&nbsp;on&nbsp;connecting
 <BR>&nbsp;<B>4</B>&nbsp;=&nbsp;block&nbsp;IP&nbsp;address&nbsp;of&nbsp;a&nbsp;sleeping&nbsp;account&nbsp;while&nbsp;sleeping&nbsp;comes&nbsp;up
 <BR>&nbsp;<B>8</B>&nbsp;=&nbsp;block&nbsp;duplicate&nbsp;IP&nbsp;address
+</DL>
+
+<P>
+
+<B>lb_nbest_readers</B> = <B>counts</B>
+<DL COMPACT><DT><DD>
+set count of best readers for load balancing, -1 = use global lb_nbest_readers, default:-1
+</DL>
+
+<P>
+
+<B>lb_nfb_readers</B> = <B>counts</B>
+<DL COMPACT><DT><DD>
+set count of fallback readers for load balancing, -1 = use global lb_nfb_readers, default:1
+</DL>
+
+<P>
+
+<B>lb_nbest_percaid</B> = <B>CAID1:count1[,CAID2:count2]...</B>
+<DL COMPACT><DT><DD>
+set count of best readers per CAIDs for load balancing, wildcard CAIDs with two-digit CAIDs possible, default:none
+<P>
+<BR>&nbsp;example:&nbsp;lb_nbest_percaid&nbsp;=&nbsp;0100:4,0200:3,03:2,04:1
+<BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(wildcard&nbsp;CAIDs&nbsp;03xx&nbsp;and&nbsp;04xx)
+</DL>
+
+<P>
+
+<B>preferlocalcards</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+SC decoding behavior:.
+<P>
+<BR>&nbsp;<B>-1</B>&nbsp;=&nbsp;global&nbsp;value&nbsp;from&nbsp;oscam.conf&nbsp;(default)
+<BR>&nbsp;&nbsp;<B>0</B>&nbsp;=&nbsp;local&nbsp;SCs&nbsp;used&nbsp;like&nbsp;a&nbsp;remote&nbsp;reader
+<BR>&nbsp;&nbsp;<B>1</B>&nbsp;=&nbsp;prefer&nbsp;cache&nbsp;exchange&nbsp;based&nbsp;SCs
+<BR>&nbsp;&nbsp;<B>2</B>&nbsp;=&nbsp;prefer&nbsp;local&nbsp;SCs
+</DL>
+
+<P>
+
+<B>cwc_disable</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = disbale CW cycle check, default:0
 </DL>
 
 <P>
@@ -163,6 +255,16 @@ define maximum hops for cache exchange, default=10
 
 <P>
 
+<B>no_wait_time</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+set wait time behaviour:
+<BR>&nbsp;
+<BR>&nbsp;<B>0</B>:&nbsp;use&nbsp;<B>wait_time</B>&nbsp;set&nbsp;in&nbsp;<B>oscam.conf</B>&nbsp;(default)
+<BR>&nbsp;<B>1</B>:&nbsp;do&nbsp;not&nbsp;use&nbsp;<B>wait_time</B>&nbsp;set&nbsp;in&nbsp;<B>oscam.conf</B>
+</DL>
+
+<P>
+
 <B>csp_ecm_filter</B> = <B>[caid][&amp;mask][@provid][$servid],n</B>
 <DL COMPACT><DT><DD>
 cache exchange incoming ECM filter setting (mode 3 only) for Cardservproxy, default:none
@@ -172,14 +274,28 @@ cache exchange incoming ECM filter setting (mode 3 only) for Cardservproxy, defa
 
 <B>cacheex_drop_csp</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
-drop incoming Cardservproxy cache (mode 3 only), detection is zero ecmd5, default:0
+1 = drop incoming Cardservproxy cache (mode 3 only), detection is zero ecmd5, default:0
 </DL>
 
 <P>
 
 <B>cacheex_allow_request</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
-allow incoming ECM request (mode 3 only), default:1
+1 = allow incoming ECM request (mode 3 only), default:1
+</DL>
+
+<P>
+
+<B>cacheex_allow_filter</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1= allow cache exchange filter (for cache exchange mode 3 only), default:1
+</DL>
+
+<P>
+
+<B>cacheex_block_fakecws</B> = <B>0</B>|<B>1</B>
+<DL COMPACT><DT><DD>
+1 = enable fake DCWs blocking (for cache exchange mode 3 only), get fake DCWs form <B>oscam.fakecws</B>, default:0
 </DL>
 
 <P>
@@ -209,6 +325,13 @@ CAID, service ID and provider ID combination, 1 =  disable, default:0
 <B>keepalive</B> = <B>0</B>|<B>1</B>
 <DL COMPACT><DT><DD>
 0 = disable keepalive between server and client for newcamd or CCcam protocol, default:1
+</DL>
+
+<P>
+
+<B>umaxidle</B> = <B>seconds</B>
+<DL COMPACT><DT><DD>
+value for user being idle before disconnect, 0 = idle disconnect disabled, -1 use clientmaxidle in global section, default:-1
 </DL>
 
 <P>
@@ -248,13 +371,27 @@ user assingment to reader groups, default:none, <I>required</I>
 <B>betatunnel</B> = <B>&lt;CAID&gt;.&lt;ServiceID&gt;:&lt;target CAID&gt;[,&lt;CAID&gt;.&lt;ServiceID&gt;:
 &lt;target CAID&gt;]...</B>
 <DL COMPACT><DT><DD>
-define Betacrypt tunneling (maximum see CS_MAXTUNTAB in <B>globals.h</B>).
+Define Betacrypt tunneling.
 The ServiceID can also be used for wildcarded CAIDs.
 <P>
 <BR>&nbsp;example:&nbsp;betatunnel&nbsp;=&nbsp;0100.0001:0200,0300.0004:0500
 <BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;betatunnel&nbsp;=&nbsp;0600.FFFF:0700
 <P>
 <I>Be carefull using abbreviations.</I>
+</DL>
+
+<P>
+<P>
+
+<B>emmreassembly</B> = <B>0</B>|<B>1</B>||<B>2</B>
+<DL COMPACT><DT><DD>
+EMM reassembly, should be set for Viaccess and Cryptoworks readers if the 
+client that you are using to send EMMs is reassembling them instead of 
+just sending them to OSCam for processing.
+<P>
+<BR>&nbsp;&nbsp;<B>0</B>:&nbsp;disabled
+<BR>&nbsp;&nbsp;<B>1</B>:&nbsp;enabled&nbsp;for&nbsp;DVB&nbsp;API
+<BR>&nbsp;&nbsp;<B>2</B>:&nbsp;enabled&nbsp;(default)
 </DL>
 
 <P>
@@ -320,6 +457,7 @@ maximum hops limit for CCcam clients, default:10
 reshare level for CCcam clients
 <P>
 <BR>&nbsp;<B>-1</B>&nbsp;=&nbsp;use&nbsp;reshare&nbsp;level&nbsp;of&nbsp;<B>oscam.conf</B>&nbsp;(default)
+<BR>&nbsp;&nbsp;<B>0</B>&nbsp;=&nbsp;resharing&nbsp;for&nbsp;direct&nbsp;peer&nbsp;only
 <BR>&nbsp;&nbsp;<B>x</B>&nbsp;=&nbsp;resharing&nbsp;for&nbsp;direct&nbsp;peer&nbsp;and&nbsp;share&nbsp;level&nbsp;x
 </DL>
 
@@ -363,7 +501,7 @@ CCcam stealth:
 <A NAME="lbAG">&nbsp;</A>
 <H2>SEE ALSO</H2>
 
-<B><A HREF="/cgi-bin/man/man2html?1+list_smargo">list_smargo</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?1+oscam">oscam</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ac">oscam.ac</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cacheex">oscam.cacheex</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cert">oscam.cert</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.conf">oscam.conf</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.dvbapi">oscam.dvbapi</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.guess">oscam.guess</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ird">oscam.ird</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.provid">oscam.provid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.server">oscam.server</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.services">oscam.services</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.tiers">oscam.tiers</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.srvid">oscam.srvid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.whitelist">oscam.whitelist</A></B>(5)
+<B><A HREF="/cgi-bin/man/man2html?1+list_smargo">list_smargo</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?1+oscam">oscam</A></B>(1), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ac">oscam.ac</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cacheex">oscam.cacheex</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.cert">oscam.cert</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.conf">oscam.conf</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.dvbapi">oscam.dvbapi</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.fakecws">oscam.fakecws</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.guess">oscam.guess</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ird">oscam.ird</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.provid">oscam.provid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.ratelimit">oscam.ratelimit</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.server">oscam.server</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.services">oscam.services</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.tiers">oscam.tiers</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.srvid">oscam.srvid</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.srvid2">oscam.srvid2</A></B>(5), <B><A HREF="/cgi-bin/man/man2html?5+oscam.whitelist">oscam.whitelist</A></B>(5)
 <P>
 
 <HR>

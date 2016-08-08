@@ -35,10 +35,16 @@ int32_t check_ip(struct s_ip *ip, IN_ADDR_T n);
 uint32_t cs_getIPfromHost(const char *hostname);
 int set_socket_priority(int fd, int priority);
 void setTCPTimeouts(int32_t sock);
+int set_nonblock(int32_t fd, bool nonblock);
+void set_so_reuseport(int fd);
 int8_t check_fd_for_data(int32_t fd);
 int32_t recv_from_udpipe(uchar *);
 int32_t process_input(uint8_t *buf, int32_t buflen, int32_t timeout);
 int32_t accept_connection(struct s_module *module, int8_t module_idx, int8_t port_idx);
 int32_t start_listener(struct s_module *module, struct s_port *port);
+
+#ifdef __CYGWIN__
+ssize_t cygwin_recv(int sock, void *buf, int count, int tflags);
+#endif
 
 #endif

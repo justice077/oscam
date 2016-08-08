@@ -38,18 +38,20 @@ reader protocol, \fIrequired\fR:
  \fBmp35\fP
  \fBnewcamd\fP|\fBnewcamd525\fP
  \fBnewcamd524\fP
- \fBpcsc\fP 
- \fBradegast\fP 
+ \fBpcsc\fP
+ \fBradegast\fP
+ \fBscam\fP
  \fBsc8in1\fP
  \fBserial\fP
- \fBsmargo\fP 
+ \fBsmargo\fP
  \fBsmartreader\fP
 .RE
 .PP
 \fBdevice\fP = \fB[<readertype>;]serial:serialnum|bus:device\fP|
          \fB<device|device:slot>\fP|
          \fB<ip|hostname>,<port>[,<lport>]\fP|
-         \fB<ip|hostname>,<gboxpport>,<gboxlport>\fP|
+         \fB<ip|hostname>,<gboxpport>\fP|
+         \fB<ip|hostname>,<scamport>\fP|
          \fBpcsc\fP|
          \fB<0|1>\fP>|
          \fBconstantcw\fP
@@ -82,9 +84,7 @@ define local or remote reader
 
  \fBlport\fP:       remapping to local TCP/IP port
 
- \fBgboxpport\fP:   TCP/IP port for remote gbox peer
-
- \fBgboxlport\fP:   TCP/IP port for local gbox peer
+ \fBgboxpport\fP:   UDP port for remote gbox peer
 
  \fBPCSC\fP:        number of PCSC reader, starting with 0
 
@@ -93,27 +93,46 @@ define local or remote reader
 
  \fBconstantcw\fP:  constant CW file name
 
-constant CW file format: CA (4 digits):ID (6 digits):SID (4 digits):PMT PID (4 digits):ECM PID (4 digits)\fI::\fR
-key (16 Bytes seperated by spaces)
+constant CW file format: 
+.TP 3n
+\(bu standard format
 
-example: 1234:123456:1234:1234:1234\fI::\fR00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+\fPCAID\fB:\fPProvider ID\fB:\fPService ID\fB:\fPPMT ID\fB:\fPECM PID\fI::\fRkey (16 Bytes seperated by spaces)
+
+example: 1234:123456:1234:2345:3456\fI::\fR00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+.TP 3n 
+\(bu extended OScam format
+
+\fPCAID\fB:\fPProvider ID\fB:\fPService ID\fB:\fPPMT ID\fB:\fPECM PID\fI:Video PID:\fRkey (16 Bytes seperated by spaces)
+
+example: 1234:123456:1234:2345:3456\fI:7890:\fR00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
 .RE
 .PP
-\fBdetect\fP = \fBCD\fP|\fBDSR\fP|\fBCTS\fP|\fBRING\fP|\fBNONE\fP|\fBgpio[1-7]\fP
+\fBdetect\fP = [\fB!\fP]\fBCD\fP|[\fB!\fP]\fBDSR\fP|[\fB!\fP]\fBCTS\fP|[\fB!\fP]\fBRING\fP|[\fB!\fP]\fBNONE\fP|[\fB!\fP]\fBgpio[1-7]\fP
 .RS 3n
-status detect of card (NONE = no detection), default:CD
+status detect of card, NONE = no detection, ! = inverse, default:CD
 .RE
 .PP
 \fBcardmhz\fP = \fBmhz\fP
 .RS 3n
-set standard SC frequency in units of 10 kHz, for Irdeto SC set to 600, for auto clock speed in Dreambox mode set to -1, refer to OVERCLOCKING, default:357
+set standard SC frequency in units of 10 kHz, for Irdeto SC set to 600 mhz, 
+for Dreambox DM800 / DM8000 set to 2700 mhz, for Dreambox DM7025 set to 
+8300 mhz, for older PowerPC Dreambox STBs set to 3150 mhz, refer to 
+OVERCLOCKING, default:357
 .RE
 .PP
 \fBmhz\fP = \fBfrequency\fP
 .RS 3n
-set reader frequency in units of 10 kHz, if \fBmhz\fP > \fBcardmhz\fP you are in overclocking mode, 
-for \fBcardmhz\fP swiching to MIPSel Dreambox mode set to 2700, for \fBcardmhz\fP swiching to PPC Dreambox mode set to 3150, 
-for \fBcardmhz\fP swiching to Dreambox DM7025 mode set to 8300, refer to OVERCLOCKING, default:357 
+set reader frequency in units of 10 kHz, if \fBmhz\fP > \fBcardmhz\fP you 
+are in overclocking mode. For Smargo readers and Dreambox internal readers 
+frequency will be set by ATR if \fBautospeed\fP is set to 1, default:357
+.RE
+.PP
+\fBautospeed\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = sets mhz according to ATR. Currently only used for smartreader, Smargo and 
+Dreambox internal protocol, other readers will be adapted to use this parameter 
+as well. If You wan't to overclock you're card set it to 0, default:1
 .RE
 .PP
 \fBdeprecated\fP = \fB0\fP|\fB1\fP
@@ -145,14 +164,9 @@ set card init mode for AzBox internal reader, default:none
 1 = use GPIO to init the reader. This needs to be set on WRT54G router, default:0
 .RE
 .PP
-\fBcool_timeout_init\fP = \fBtimeout\fP
+\fB ins2e06\fP = \fBpayload\fP
 .RS 3n
-set timeout for SC init in milli-seconds for Coolstream internal reader only, default:0
-.RE
-.PP
-\fBcool_timeout_after_init\fP = \fBtimeout\fP
-.RS 3n
-set read/transmit timeout after SC init in milli-seconds for Coolstream internal reader only, default:0
+add check control for pin payload (4 hex bytes) for NDS Videoguard 2 SCs, valid for physical readers only, default:none
 .RE
 .PP
 \fBins7e\fP = \fBpayload\fP
@@ -165,6 +179,11 @@ add 26 hex-bytes payload for NDS Videoguard 2 SCs, valid for physical readers on
 set TA1 byte for NDS Videoguard 2 SCs, valid for physical readers only, default:none
 .RE
 .PP
+\fBfix07\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1=enable 0x07 fix for NDS Videoguard 2 SCs, valid for physical readers only, default:1
+.RE
+.PP
 \fBforce_irdeto\fP = \fB0\fP|\fB1\fP
 .RS 3n
 1 = force Irdeto SC mode even if RSA key is set for Irdeto tunnled Nagravion SC, default:0
@@ -172,7 +191,7 @@ set TA1 byte for NDS Videoguard 2 SCs, valid for physical readers only, default:
 .PP
 \fBnagra_read\fP = \fB0\fP|\fB1\fP|\fB2\fP
 .RS 3n
-read Nagravison records (on NCMED cards only):
+read Nagravison records (on NCMED SCs only):
 
  \fB0\fP = disabled (default)
  \fB1\fP = read all records with expired rights
@@ -184,9 +203,9 @@ read Nagravison records (on NCMED cards only):
 RSA key for Nagravision/Tiger SCs, CAM key data for Irdeto SCs, Conax SCs, default:none
 .RE
 .PP
-\fBfix9993\fP = \fB0\fP|\fB1\fP
+\fBdeskey\fP = \fBDES key\fP
 .RS 3n
-1 = enable fix for 9993 error with CAID 0919 SCs, default:0
+DES key for Viaccess SCs post-processing, default:none
 .RE
 .PP
 \fBboxkey\fP = \fBbox key\fP
@@ -196,7 +215,21 @@ box key for Nagravision SCs / CAM key for Irdeto SCs
 .PP
 \fBpincode\fP = \fBpincode\fP
 .RS 3n
-pincode for Conax and Cryptoworks SCs, default:none
+pincode for Conax, Cryptoworks and Viaccess SCs, default:none
+.RE
+.PP
+\fBfix9993\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = enable fix for 9993 error with CAID 0919 Videoguard SCs, default:0
+.RE
+.PP
+\fBreadtiers\fP = \fB0\fP|\fB1\fP|\fB2\fP
+.RS 3n
+method to get tiers of NDS Videoguard SCs:
+
+ \fB0\fP = disabled (default)
+ \fB1\fP = ins70 method
+ \fB2\fP = ins76 method
 .RE
 .PP
 \fBboxid\fP = \fBNDS box ID\fP
@@ -309,7 +342,7 @@ example: auprovid = 123456
 .PP
 \fBinactivitytimeout\fP = \fBseconds\fP
 .RS 3n
-inactivity timeout for all TCP based remote readers, -1 = reconnect on network failure for newcamd based readers, even in idle, default:0
+inactivity timeout for all TCP based remote readers, -1 = reconnect on network failure for newcamd, even in idle, default:0
 .RE
 .PP
 \fBreconnecttimeout\fP = \fBseconds\fP
@@ -317,9 +350,19 @@ inactivity timeout for all TCP based remote readers, -1 = reconnect on network f
 reconnect if missing answers from a remote reader, default:30
 .RE
 .PP
+\fBreconnectdelay\fP = \fBmilli-seconds\fP
+.RS 3n
+set maximum TCP connection block delay, default:60000
+.RE
+.PP
 \fBconnectoninit\fP = \fB0\fP|\fB1\fP
 .RS 3n
 1 = allow newcamd connections to be established on startup although there isn't a request yet, default:0
+.RE
+.PP
+\fBkeepalive\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = allow cs378x TCP socket to be always connected, default:0. Always on if cacheex reader type.
 .RE
 .PP
 \fBfallback\fP = \fB0\fP|\fB1\fP
@@ -327,11 +370,24 @@ reconnect if missing answers from a remote reader, default:30
 1 = define reader as fallback, standard and fallback reader must have the same group, default:0
 .RE
 .PP
+\fBfallback_percaid\fP = \fB<CAID>[:<ident>[,ident]]...[;<CAID>[:<ident>[,ident]]...]....\fP
+.RS 3n
+use reader as fallback for defined CAIDs only, two-digit wildcard CAIDs are possible, \fBfallback_percaid\fP overrules \fBfallback\fP, default:none
+
+ example: fallback_percaid = 1234:234567;89;10:345678
+.RE
+.PP
 \fBemmcache\fP = \fBusecache,rewrite,logging\fP
 .RS 3n
 set EMM cache of local reader:
 
- \fBusecache\fP = \fB0\fP|\fB1\fP: 1 = enable EMM caching, default:0
+ \fBusecache\fP = \fB0\fP|\fB1\fP||\fB2\fP
+
+            \fB0\fP = EMM caching disabeld (default)
+            \fB1\fP = enable EMM caching and save EMMs to file after 
+                stopping OSCam
+            \fB2\fP = enable EMM caching, don't save EMMs to file 
+                after stopping OSCam
 
  \fBrewrite\fP  = determines how often one and the same EMM is
             written, default:0
@@ -346,13 +402,6 @@ set EMM cache of local reader:
             \fB16\fP = logging disabled AU
 
  example: emmcache = 1,3,2
-.RE
-.PP
-\fBemmreassembly\fP = \fB0\fP|\fB1\fP
-.RS 3n
-1 = enable EMM reassembly, should be set for Viaccess and Cryptoworks readers 
-if the client that you are using to send EMMs is reassembling them instead of 
-just sending them to OSCam for processing, default:1
 .RE
 .PP
 \fBcacheex\fP = \fB0\fP|\fB1\fP|\fB2\fP|\fB3\fP
@@ -383,12 +432,22 @@ cache exchange incoming ECM filter setting (mode 2 only) for Cardservproxy, defa
 .PP
 \fBcacheex_drop_csp\fP = \fB0\fP|\fB1\fP
 .RS 3n
-drop incoming Cardservproxy cache (mode 2 only), detection is zero ecmd5, default:0
+1 = drop incoming Cardservproxy cache (mode 2 only), detection is zero ecmd5, default:0
 .RE
 .PP
 \fBcacheex_allow_request\fP = \fB0\fP|\fB1\fP
 .RS 3n
-allow incoming ECM request (mode 2), default:1
+1 = allow incoming ECM request (mode 2), default:1
+.RE
+.PP
+\fBcacheex_allow_filter\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = allow cache exchange filter (for cache exchange mode 2 only), default:1
+.RE
+.PP
+\fBcacheex_block_fakecws\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = enable fake DCWs blocking (for cache exchange mode 2 only), get fake DCWs form \fBoscam.fakecws\fP, default:0
 .RE
 .PP
 \fBecmwhitelist\fP = [\fBCAID\fP[@\fBprovid\fP]:]\fBlength\fP[,\fBlength\fP]...[;[\fBCAID\fP[@\fBprovid\fP]:]\fBlength\fP[,\fBlength\fP]...]...
@@ -483,9 +542,17 @@ list of EMM-nanos to block (in hex w/o 0x) or all EMM-nanos, valid for physical 
 1 = block unknown types of EMMs, default:0
 .RE
 .PP
-\fBblockemm-bylen\fP = \fB[length,length]...\fP
+\fBblockemm-bylen\fP = \fB[length range,length range]...\fP
 .RS 3n
-block all types of EMMs by lenght, maximum 10 values, default:none
+block all types of EMMs by length, default:none
+
+ example: blockemm-bylen = 1-10,11-
+.RE
+.PP
+\fBread_old_classes\fP = \fB0\fP|\fB1\fP \fI(Viaccess SCs only)\fR
+.RS 3n
+0 = read only active entitlements
+1 = read all entitlements (default)
 .RE
 .PP
 \fBsaveemm-u\fP = \fB0\fP|\fB1\fP
@@ -541,11 +608,26 @@ force restart reader after seconds,default 0 disabled.
 \fIIn normal operation mode this parameter is not required. Parameter is incompatible with DVB standard.\fR
 .RE
 .PP
+\fBident\fP = \fB<CAID1>[:<ident1>[,<ident2>]...][;<CAID2>[:<ident3>[,<ident4>]...]]...\fP
+.RS 3n
+use this reader as local in loadbalancer's reader selection, default:none
+.RE
+.PP
+\fBlb_whitelist_services\fP = \fB<services>,<services>...\fP
+.RS 3n
+reader assignement to service group for channels which may never be blocked by the loadbalancer to the reader , default=none
+.RE
+.PP
 \fBlb_weight\fP = \fBweight\fP
 .RS 3n
-the higher the value the higher the probability for reader selection, default:100
+the higher the value the higher the probability for reader selection in load balacing mode, default:100
 
  It's an divider for the average responstime.
+.RE
+.PP
+\fBlb_force_fallback\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = set the reader always as fallaback for load balacing without considering the reader's statistics, default:0
 .RE
 .PP
 \fBcccversion\fP = \fB<main version>.<version>.<sub version>\fP
@@ -577,7 +659,8 @@ set hop for non CCCam readers, default:0
 .RS 3n
 set reader's CCcam reshare hop, default:0
 
- \fB-1\fP = no resharing
+ \fB-1\fP = reshare value off cccam in global config
+  \fb0\fP = resharing for direct peer only
   \fBx\fP = resharing for direct peer and share level x
 .RE
 .PP
@@ -601,11 +684,6 @@ reconnect again after ECM request timeout in milli-seconds, default:4000
 filters all readers with hops smaller than number, default:0
 .RE
 .PP
-\fBgbox_my_password\fP = \fBpassword\fP
-.RS 3n
-password for connection to local gbox peer, default:none
-.RE
-.PP
 \fBgbox_reshare\fP = \fBlevel\fP
 .RS 3n
 gbox reshare level of local cards, default:0
@@ -621,9 +699,9 @@ maximum distance to receive gbox peer cards, default:2
 maximum of gbox peers ECMs will be send to, default:3
 .RE
 .PP
-\fBgbox_group\fP = \fB\fP
+\fBuse_ssl\fP = \fB0\fP|\fB1\fP
 .RS 3n
-reader assingment to gbox group, default:none
+1 = use SSL for ghttp protocol, default:0
 .RE
 .SH OVERCLOCKING
 .TP 3n
@@ -821,4 +899,4 @@ gbox reader
  group    = 11
  caid     = 1100
 .SH "SEE ALSO"
-\fBlist_smargo\fR(1), \fBoscam\fR(1), \fBoscam.ac\fR(5), \fBoscam.cacheex\fR(5), \fBoscam.cert\fR(5), \fBoscam.conf\fR(5), \fBoscam.dvbapi\fR(5), \fBoscam.guess\fR(5), \fBoscam.ird\fR(5), \fBoscam.provid\fR(5), \fBoscam.services\fR(5), \fBoscam.srvid\fR(5), \fBoscam.tiers\fR(5), \fBoscam.user\fR(5), \fBoscam.whitelist\fR(5)
+\fBlist_smargo\fR(1), \fBoscam\fR(1), \fBoscam.ac\fR(5), \fBoscam.cacheex\fR(5), \fBoscam.cert\fR(5), \fBoscam.conf\fR(5), \fBoscam.dvbapi\fR(5), \fBoscam.fakecws\fR(5), \fBoscam.guess\fR(5), \fBoscam.ird\fR(5), \fBoscam.provid\fR(5), \fBoscam.ratelimit\fR(5), \fBoscam.services\fR(5), \fBoscam.srvid\fR(5), \fBoscam.srvid2\fR(5), \fBoscam.tiers\fR(5), \fBoscam.user\fR(5), \fBoscam.whitelist\fR(5)

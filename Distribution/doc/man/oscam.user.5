@@ -50,6 +50,11 @@ list of all allowed connection protocols, default:all connection protocols
 account enabled from hh:mm to hh:mm, default:none
 .RE
 .PP
+\fBmax_connections\fP = \fBcount\fP
+.RS 3n
+maximum allowed connections per user when unique level will be adducted, default:1
+.RE
+.PP
 \fBuniq\fP = \fB0\fP|\fB1\fP|\fB2\fP|\fB4\fP
 .RS 3n
 unique level:
@@ -61,22 +66,23 @@ unique level:
  \fB3\fP = only one connection per user, but only the last login 
      will survive (old MpCS behavior)
  \fB4\fP = set user only to fake if source ip is different, 
-     but only the last login will survive
+     but only the last login will survive 
 .RE
 .PP
 \fBnumusers\fP = \fBquantity\fP
 .RS 3n
-anti-cascading: user per account, 0 = anti-cascading disabled, default:0
+anti-cascading: user per account, 0 = anti-cascading disabled, -1 = global value from oscam.conf, default:-1
 .RE
 .PP
 \fBpenalty\fP = \fB0\fP|\fB1\fP|\fB2\fP
 .RS 3n
-level of penalty, default: level of oscam.conf:
+level of penalty:
 
- \fB0\fP = only logging
- \fB1\fP = send fake CWs
- \fB2\fP = disbable user temporary
- \fB3\fP = send delayed CWs
+ \fB-1\fP = level of oscam.conf (default)
+ \fB 0\fP = only logging
+ \fB 1\fP = send fake CWs
+ \fB 2\fP = temporary user ban
+ \fB 3\fP = send delayed CWs
 .RE
 .PP
 \fBfakedelay\fP = \fB0\fP|\fB1\fP|\fBmilli-seconds\fP
@@ -87,6 +93,37 @@ set fake delay time individually for user:
  \fB-1\fP = fake delay of oscam.conf (default)
 .RE
 .PP
+\fBacosc_max_active_sids\fP = \fBcount\fP
+.RS 3n
+maximum active SIDs with anti-cascading over SID, 0 = unlimited, -1 = use global setting, default:0
+.RE
+.PP
+\fBacosc_zap_limit\fP = \fBcount\fP
+.RS 3n
+zap limit for anti-cascading over SID, 0 = unlimited, -1 = use global setting, default:0
+.RE
+.PP
+\fBacosc_penalty\fP = \fB0\fP|\fB1\fP|\fB2\fP|\fB3\fP|\fB-1\fP
+.RS 3n
+level of penalty with anti-cascading over SID count:
+
+  \fB0\fP = only logging (default)
+  \fB1\fP = send fake CWs
+  \fB2\fP = temporary user ban
+  \fB3\fP = send delayed CWs
+ \fB-1\fP = use global setting
+.RE
+.PP
+\fBacosc_penalty_duration\fP = \fBseconds\fP
+.RS 3n
+penalty duration for anti-cascading over SID count, -1 = use global setting, default:0
+.RE
+.PP
+\fBacosc_delay\fP = \fBmilli-seconds\fP
+.RS 3n
+delay for anti-cascading over SID count, -1 = use global setting, default:0
+.RE
+.PP
 \fBfailban\fP = \fB0\fP|\fB2\fP|\fB4\fP|\fB8\fP
 .RS 3n
 mask for IP address based blocking:
@@ -95,6 +132,39 @@ mask for IP address based blocking:
  \fB2\fP = block IP address of a disabled account on connecting
  \fB4\fP = block IP address of a sleeping account while sleeping comes up
  \fB8\fP = block duplicate IP address
+.RE
+.PP
+\fBlb_nbest_readers\fP = \fBcounts\fP
+.RS 3n
+set count of best readers for load balancing, -1 = use global lb_nbest_readers, default:-1
+.RE
+.PP
+\fBlb_nfb_readers\fP = \fBcounts\fP
+.RS 3n
+set count of fallback readers for load balancing, -1 = use global lb_nfb_readers, default:1
+.RE
+.PP
+\fBlb_nbest_percaid\fP = \fBCAID1:count1[,CAID2:count2]...\fP
+.RS 3n
+set count of best readers per CAIDs for load balancing, wildcard CAIDs with two-digit CAIDs possible, default:none
+
+ example: lb_nbest_percaid = 0100:4,0200:3,03:2,04:1
+          (wildcard CAIDs 03xx and 04xx)
+.RE
+.PP
+\fBpreferlocalcards\fP = \fB0\fP|\fB1\fP
+.RS 3n
+SC decoding behavior:.
+
+ \fB-1\fP = global value from oscam.conf (default)
+  \fB0\fP = local SCs used like a remote reader
+  \fB1\fP = prefer cache exchange based SCs
+  \fB2\fP = prefer local SCs
+.RE
+.PP
+\fBcwc_disable\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = disbale CW cycle check, default:0
 .RE
 .PP
 \fBcacheex\fP = \fB0\fP|\fB1\fP|\fB2\fP|\fB3\fP
@@ -118,6 +188,14 @@ set cache exchange mode
 define maximum hops for cache exchange, default=10
 .RE
 .PP
+\fBno_wait_time\fP = \fB0\fP|\fB1\fP
+.RS 3n
+set wait time behaviour:
+ 
+ \fB0\fP: use \fBwait_time\fP set in \fBoscam.conf\fP (default)
+ \fB1\fP: do not use \fBwait_time\fP set in \fBoscam.conf\fP
+.RE
+.PP
 \fBcsp_ecm_filter\fP = \fB[caid][&mask][@provid][$servid],n\fP
 .RS 3n
 cache exchange incoming ECM filter setting (mode 3 only) for Cardservproxy, default:none
@@ -125,12 +203,22 @@ cache exchange incoming ECM filter setting (mode 3 only) for Cardservproxy, defa
 .PP
 \fBcacheex_drop_csp\fP = \fB0\fP|\fB1\fP
 .RS 3n
-drop incoming Cardservproxy cache (mode 3 only), detection is zero ecmd5, default:0
+1 = drop incoming Cardservproxy cache (mode 3 only), detection is zero ecmd5, default:0
 .RE
 .PP
 \fBcacheex_allow_request\fP = \fB0\fP|\fB1\fP
 .RS 3n
-allow incoming ECM request (mode 3 only), default:1
+1 = allow incoming ECM request (mode 3 only), default:1
+.RE
+.PP
+\fBcacheex_allow_filter\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1= allow cache exchange filter (for cache exchange mode 3 only), default:1
+.RE
+.PP
+\fBcacheex_block_fakecws\fP = \fB0\fP|\fB1\fP
+.RS 3n
+1 = enable fake DCWs blocking (for cache exchange mode 3 only), get fake DCWs form \fBoscam.fakecws\fP, default:0
 .RE
 .PP
 \fBsleep\fP = \fBminutes\fP
@@ -152,6 +240,11 @@ CAID, service ID and provider ID combination, 1 =  disable, default:0
 \fBkeepalive\fP = \fB0\fP|\fB1\fP
 .RS 3n
 0 = disable keepalive between server and client for newcamd or CCcam protocol, default:1
+.RE
+.PP
+\fBumaxidle\fP = \fBseconds\fP
+.RS 3n
+value for user being idle before disconnect, 0 = idle disconnect disabled, -1 use clientmaxidle in global section, default:-1
 .RE
 .PP
 \fBcaid\fP = \fB<CAID>[&<mask>][:<target CAID>][,<CAID>[&<mask>][:<target CAID>]]...\fP
@@ -183,13 +276,25 @@ user assingment to reader groups, default:none, \fIrequired\fR
 \fBbetatunnel\fP = \fB<CAID>.<ServiceID>:<target CAID>[,<CAID>.<ServiceID>:
 <target CAID>]...\fP
 .RS 3n
-define Betacrypt tunneling (maximum see CS_MAXTUNTAB in \fBglobals.h\fP).
+Define Betacrypt tunneling.
 The ServiceID can also be used for wildcarded CAIDs.
 
  example: betatunnel = 0100.0001:0200,0300.0004:0500
           betatunnel = 0600.FFFF:0700
 
 \fIBe carefull using abbreviations.\fR
+.RE
+
+.PP
+\fBemmreassembly\fP = \fB0\fP|\fB1\fP||\fB2\fP
+.RS 3n
+EMM reassembly, should be set for Viaccess and Cryptoworks readers if the 
+client that you are using to send EMMs is reassembling them instead of 
+just sending them to OSCam for processing.
+
+  \fB0\fP: disabled
+  \fB1\fP: enabled for DVB API
+  \fB2\fP: enabled (default)
 .RE
 .PP
 \fBservices\fP = \fB[!]services[,[!]<services>]...\fP
@@ -241,6 +346,7 @@ maximum hops limit for CCcam clients, default:10
 reshare level for CCcam clients
 
  \fB-1\fP = use reshare level of \fBoscam.conf\fR (default)
+  \fB0\fP = resharing for direct peer only
   \fBx\fP = resharing for direct peer and share level x
 .RE
 .PP
@@ -275,4 +381,4 @@ CCcam stealth:
  ident      = 0100:000000
  uniq       = 1
 .SH "SEE ALSO"
-\fBlist_smargo\fR(1), \fBoscam\fR(1), \fBoscam.ac\fR(5), \fBoscam.cacheex\fR(5), \fBoscam.cert\fR(5), \fBoscam.conf\fR(5), \fBoscam.dvbapi\fR(5), \fBoscam.guess\fR(5), \fBoscam.ird\fR(5), \fBoscam.provid\fR(5), \fBoscam.server\fR(5), \fBoscam.services\fR(5), \fBoscam.tiers\fR(5), \fBoscam.srvid\fR(5), \fBoscam.whitelist\fR(5)
+\fBlist_smargo\fR(1), \fBoscam\fR(1), \fBoscam.ac\fR(5), \fBoscam.cacheex\fR(5), \fBoscam.cert\fR(5), \fBoscam.conf\fR(5), \fBoscam.dvbapi\fR(5), \fBoscam.fakecws\fR(5), \fBoscam.guess\fR(5), \fBoscam.ird\fR(5), \fBoscam.provid\fR(5), \fBoscam.ratelimit\fR(5), \fBoscam.server\fR(5), \fBoscam.services\fR(5), \fBoscam.tiers\fR(5), \fBoscam.srvid\fR(5), \fBoscam.srvid2\fR(5), \fBoscam.whitelist\fR(5)

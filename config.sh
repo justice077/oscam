@@ -1,24 +1,28 @@
 #!/bin/sh
 
-addons="WEBIF TOUCH HAVE_DVBAPI IRDETO_GUESSING CS_ANTICASC WITH_DEBUG MODULE_MONITOR WITH_SSL WITH_LB CS_CACHEEX CW_CYCLE_CHECK LCDSUPPORT LEDSUPPORT IPV6SUPPORT"
-protocols="MODULE_CAMD33 MODULE_CAMD35 MODULE_CAMD35_TCP MODULE_NEWCAMD MODULE_CCCAM MODULE_CCCSHARE MODULE_GBOX MODULE_RADEGAST MODULE_SERIAL MODULE_CONSTCW MODULE_PANDORA MODULE_GHTTP"
+addons="WEBIF WEBIF_LIVELOG WEBIF_JQUERY TOUCH WITH_SSL HAVE_DVBAPI READ_SDT_CHARSETS IRDETO_GUESSING CS_ANTICASC WITH_DEBUG MODULE_MONITOR WITH_LB CS_CACHEEX CW_CYCLE_CHECK LCDSUPPORT LEDSUPPORT CLOCKFIX IPV6SUPPORT"
+protocols="MODULE_CAMD33 MODULE_CAMD35 MODULE_CAMD35_TCP MODULE_NEWCAMD MODULE_CCCAM MODULE_CCCSHARE MODULE_GBOX MODULE_RADEGAST MODULE_SCAM MODULE_SERIAL MODULE_CONSTCW MODULE_PANDORA MODULE_GHTTP"
 readers="READER_NAGRA READER_IRDETO READER_CONAX READER_CRYPTOWORKS READER_SECA READER_VIACCESS READER_VIDEOGUARD READER_DRE READER_TONGFANG READER_STREAMGUARD READER_BULCRYPT READER_GRIFFIN READER_DGCRYPT"
-card_readers="CARDREADER_PHOENIX CARDREADER_INTERNAL CARDREADER_SC8IN1 CARDREADER_MP35 CARDREADER_SMARGO CARDREADER_DB2COM CARDREADER_STAPI"
+card_readers="CARDREADER_PHOENIX CARDREADER_INTERNAL CARDREADER_SC8IN1 CARDREADER_MP35 CARDREADER_SMARGO CARDREADER_DB2COM CARDREADER_STAPI CARDREADER_STAPI5 CARDREADER_STINGER CARDREADER_DRECAS"
 
 defconfig="
 CONFIG_WEBIF=y
+CONFIG_WEBIF_LIVELOG=y
+CONFIG_WEBIF_JQUERY=y
 CONFIG_TOUCH=y
+# CONFIG_WITH_SSL=n
 CONFIG_HAVE_DVBAPI=y
+CONFIG_READ_SDT_CHARSETS=y
 CONFIG_IRDETO_GUESSING=y
 CONFIG_CS_ANTICASC=y
 CONFIG_WITH_DEBUG=y
 CONFIG_MODULE_MONITOR=y
-# CONFIG_WITH_SSL=n
 CONFIG_WITH_LB=y
 CONFIG_CS_CACHEEX=y
 CONFIG_CW_CYCLE_CHECK=y
 # CONFIG_LCDSUPPORT=n
 # CONFIG_LEDSUPPORT=n
+CONFIG_CLOCKFIX=y
 # CONFIG_IPV6SUPPORT=n
 # CONFIG_MODULE_CAMD33=n
 CONFIG_MODULE_CAMD35=y
@@ -31,7 +35,8 @@ CONFIG_MODULE_RADEGAST=y
 CONFIG_MODULE_SERIAL=y
 CONFIG_MODULE_CONSTCW=y
 CONFIG_MODULE_PANDORA=y
-# CONFIG_MODULE_GHTTP=n
+CONFIG_MODULE_SCAM=y
+CONFIG_MODULE_GHTTP=y
 CONFIG_WITH_CARDREADER=y
 CONFIG_READER_NAGRA=y
 CONFIG_READER_IRDETO=y
@@ -46,12 +51,15 @@ CONFIG_READER_BULCRYPT=y
 CONFIG_READER_GRIFFIN=y
 CONFIG_READER_DGCRYPT=y
 CARDREADER_PHOENIX=y
+CARDREADER_DRECAS=y
 CARDREADER_INTERNAL=y
 CARDREADER_SC8IN1=y
 CARDREADER_MP35=y
 CARDREADER_SMARGO=y
 CARDREADER_DB2COM=y
 CARDREADER_STAPI=y
+# CARDREADER_STAPI5=n
+CARDREADER_STINGER=y
 "
 
 usage() {
@@ -126,7 +134,7 @@ USE_FLAGS=
 have_flag() {
 	for FLAG in $USE_FLAGS
 	do
-		[ $FLAG = "$1" ] && return 0
+		[ "$FLAG" = "$1" ] && return 0
 	done
 	return 1
 }
@@ -148,7 +156,7 @@ have_any_flags() {
 not_have_flag() {
 	for FLAG in $USE_FLAGS
 	do
-		[ $FLAG = "$1" ] && return 1
+		[ "$FLAG" = "$1" ] && return 1
 	done
 	return 0
 }
@@ -221,6 +229,16 @@ list_disabled() {
 	done
 }
 
+write_enabled() {
+	defined_file="webif/is_defined.txt"
+	pages_c="webif/pages.c"
+	rm -f $defined_file $pages_c 2>/dev/null
+	for OPT in $(get_opts) WITH_CARDREADER
+	do
+		enabled $OPT && printf "%s\n" $OPT >> $defined_file
+	done
+}
+
 valid_opt() {
 	[ "$1" = "WITH_CARDREADER" ] && return 0 # Special case
 	echo $addons $protocols $readers $card_readers | grep -w "$1" >/dev/null
@@ -229,7 +247,8 @@ valid_opt() {
 
 enable_opt() {
 	valid_opt $1 && disabled $1 && {
-		sed -i.bak -e "s|//#define $1 1$|#define $1 1|g" config.h && rm config.h.bak
+		sed -e "s|//#define $1 1$|#define $1 1|g" config.h > config.h.tmp && \
+		mv config.h.tmp config.h
 		echo "Enable $1"
 	}
 }
@@ -243,7 +262,8 @@ enable_opts() {
 
 disable_opt() {
 	valid_opt $1 && enabled $1 && {
-		sed -i.bak -e "s|#define $1 1$|//#define $1 1|g" config.h && rm config.h.bak
+		sed -e "s|#define $1 1$|//#define $1 1|g" config.h > config.h.tmp && \
+		mv config.h.tmp config.h
 		echo "Disable $1"
 	}
 }
@@ -271,15 +291,20 @@ update_deps() {
 	# Calculate dependencies
 	enabled_any $(get_opts readers) $(get_opts card_readers) && enable_opt WITH_CARDREADER >/dev/null
 	disabled_all $(get_opts readers) $(get_opts card_readers) && disable_opt WITH_CARDREADER >/dev/null
+	disabled WEBIF && disable_opt WEBIF_LIVELOG >/dev/null
+	disabled WEBIF && disable_opt WEBIF_JQUERY >/dev/null
 	enabled MODULE_CCCSHARE && enable_opt MODULE_CCCAM >/dev/null
-	enabled_any CARDREADER_DB2COM CARDREADER_MP35 CARDREADER_SC8IN1 && enable_opt CARDREADER_PHOENIX >/dev/null
+	enabled_any CARDREADER_DB2COM CARDREADER_MP35 CARDREADER_SC8IN1 CARDREADER_STINGER && enable_opt CARDREADER_PHOENIX >/dev/null
 }
 
 list_config() {
 	update_deps
 	# Handle use flags
 	have_flag USE_STAPI && echo "CONFIG_WITH_STAPI=y" || echo "# CONFIG_WITH_STAPI=n"
+	have_flag USE_STAPI5 && echo "CONFIG_WITH_STAPI5=y" || echo "# CONFIG_WITH_STAPI5=n"
 	have_flag USE_COOLAPI && echo "CONFIG_WITH_COOLAPI=y" || echo "# CONFIG_WITH_COOLAPI=n"
+	have_flag USE_COOLAPI2 && echo "CONFIG_WITH_COOLAPI2=y" || echo "# CONFIG_WITH_COOLAPI2=n"
+	have_flag USE_SU980 && echo "CONFIG_WITH_SU980=y" || echo "# CONFIG_WITH_SU980=n"
 	have_flag USE_AZBOX && echo "CONFIG_WITH_AZBOX=y" || echo "# CONFIG_WITH_AZBOX=n"
 	have_flag USE_MCA && echo "CONFIG_WITH_MCA=y" || echo "# CONFIG_WITH_MCA=n"
 	have_flag USE_LIBCRYPTO && echo "CONFIG_WITH_LIBCRYPTO=y" || echo "# CONFIG_WITH_LIBCRYPTO=n"
@@ -293,14 +318,21 @@ list_config() {
 		then
 			# Internal card reader is actually three different readers depending on USE flags
 			enabled $OPT && have_flag USE_AZBOX && echo "CONFIG_${OPT}_AZBOX=y" || echo "# CONFIG_${OPT}_AZBOX=n"
-			enabled $OPT && have_flag USE_COOLAPI && echo "CONFIG_${OPT}_COOLAPI=y" || echo "# CONFIG_${OPT}_COOLAPI=n"
-			enabled $OPT && not_have_all_flags USE_AZBOX USE_COOLAPI && echo "CONFIG_${OPT}_SCI=y" || echo "# CONFIG_${OPT}_SCI=n"
+			enabled $OPT && have_any_flags USE_COOLAPI USE_SU980 && echo "CONFIG_${OPT}_COOLAPI=y" || echo "# CONFIG_${OPT}_COOLAPI=n"
+			enabled $OPT && have_flag USE_COOLAPI2 && echo "CONFIG_${OPT}_COOLAPI2=y" || echo "# CONFIG_${OPT}_COOLAPI2=n"
+			enabled $OPT && not_have_all_flags USE_AZBOX USE_COOLAPI USE_COOLAPI2 USE_SU980 && echo "CONFIG_${OPT}_SCI=y" || echo "# CONFIG_${OPT}_SCI=n"
 			continue
 		fi
 		if [ $OPT = CARDREADER_STAPI ]
 		then
 			# Enable CARDREADER_STAPI only if USE_STAPI is set
 			enabled $OPT && have_flag USE_STAPI && echo "CONFIG_$OPT=y" || echo "# CONFIG_$OPT=n"
+			continue
+		fi
+		if [ $OPT = CARDREADER_STAPI5 ]
+		then
+			# Enable CARDREADER_STAPI5 only if USE_STAPI5 is set
+			enabled $OPT && have_flag USE_STAPI5 && echo "CONFIG_$OPT=y" || echo "# CONFIG_$OPT=n"
 			continue
 		fi
 		enabled $OPT && echo "CONFIG_$OPT=y" || echo "# CONFIG_$OPT=n"
@@ -312,8 +344,8 @@ list_config() {
 	not_have_flag USE_LIBCRYPTO && echo "CONFIG_LIB_AES=y" || echo "# CONFIG_LIB_AES=n"
 	enabled MODULE_CCCAM && echo "CONFIG_LIB_RC6=y" || echo "# CONFIG_LIB_RC6=n"
 	not_have_flag USE_LIBCRYPTO && enabled MODULE_CCCAM && echo "CONFIG_LIB_SHA1=y" || echo "# CONFIG_LIB_SHA1=n"
-	enabled_any MODULE_NEWCAMD READER_DRE && echo "CONFIG_LIB_DES=y" || echo "# CONFIG_LIB_DES=n"
-	enabled_any MODULE_CCCAM READER_NAGRA && echo "CONFIG_LIB_IDEA=y" || echo "# CONFIG_LIB_IDEA=n"
+	enabled_any READER_DRE MODULE_SCAM READER_VIACCESS && echo "CONFIG_LIB_DES=y" || echo "# CONFIG_LIB_DES=n"
+	enabled_any MODULE_CCCAM READER_NAGRA READER_SECA && echo "CONFIG_LIB_IDEA=y" || echo "# CONFIG_LIB_IDEA=n"
 	not_have_flag USE_LIBCRYPTO && enabled_any READER_CONAX READER_CRYPTOWORKS READER_NAGRA && echo "CONFIG_LIB_BIGNUM=y" || echo "# CONFIG_LIB_BIGNUM=n"
 }
 
@@ -362,14 +394,16 @@ check_test() {
 
 disable_all() {
 	for i in $1; do
-		sed -i.bak -e "s/^#define ${i} 1$/\/\/#define ${i} 1/g" $tempfileconfig
+		sed -e "s/^#define ${i} 1$/\/\/#define ${i} 1/g" $tempfileconfig > ${tempfileconfig}.tmp && \
+		mv ${tempfileconfig}.tmp $tempfileconfig
 	done
 }
 
 enable_package() {
 	for i in $(cat $tempfile); do
 		strip=$(echo $i | sed "s/\"//g")
-		sed -i.bak -e "s/\/\/#define ${strip} 1$/#define ${strip} 1/g" $tempfileconfig
+		sed -e "s/\/\/#define ${strip} 1$/#define ${strip} 1/g" $tempfileconfig > ${tempfileconfig}.tmp && \
+		mv ${tempfileconfig}.tmp $tempfileconfig
 	done
 }
 
@@ -405,20 +439,24 @@ print_components() {
 
 menu_addons() {
 	${DIALOG} --checklist "\nChoose add-ons:\n " $height $width $listheight \
-		WEBIF				"Web Interface"				$(check_test "WEBIF") \
-		TOUCH				"Touch Web Interface"				$(check_test "TOUCH") \
-		HAVE_DVBAPI			"DVB API"					$(check_test "HAVE_DVBAPI") \
-		IRDETO_GUESSING		"Irdeto guessing"			$(check_test "IRDETO_GUESSING") \
-		CS_ANTICASC			"Anti cascading"			$(check_test "CS_ANTICASC") \
-		WITH_DEBUG			"Debug messages"			$(check_test "WITH_DEBUG") \
-		MODULE_MONITOR		"Monitor"					$(check_test "MODULE_MONITOR") \
-		WITH_SSL			"OpenSSL support"			$(check_test "WITH_SSL") \
-		WITH_LB				"Loadbalancing"				$(check_test "WITH_LB") \
-		CS_CACHEEX			"Cache exchange"			$(check_test "CS_CACHEEX") \
-		CW_CYCLE_CHECK			"CW Cycle Check"			$(check_test "CW_CYCLE_CHECK") \
-		LCDSUPPORT			"LCD support"				$(check_test "LCDSUPPORT") \
-		LEDSUPPORT			"LED support"				$(check_test "LEDSUPPORT") \
-		IPV6SUPPORT			"IPv6 support (experimental)"		$(check_test "IPV6SUPPORT") \
+		WEBIF				"Web Interface"							$(check_test "WEBIF") \
+		WEBIF_LIVELOG		"LiveLog"								$(check_test "WEBIF_LIVELOG") \
+		WEBIF_JQUERY		"Jquery onboard (if disabled webload)"	$(check_test "WEBIF_JQUERY") \
+		TOUCH				"Touch Web Interface"					$(check_test "TOUCH") \
+		WITH_SSL			"OpenSSL support"						$(check_test "WITH_SSL") \
+		HAVE_DVBAPI			"DVB API"								$(check_test "HAVE_DVBAPI") \
+		READ_SDT_CHARSETS	"DVB API read-sdt charsets"				$(check_test "READ_SDT_CHARSETS") \
+		IRDETO_GUESSING		"Irdeto guessing"						$(check_test "IRDETO_GUESSING") \
+		CS_ANTICASC			"Anti cascading"						$(check_test "CS_ANTICASC") \
+		WITH_DEBUG			"Debug messages"						$(check_test "WITH_DEBUG") \
+		MODULE_MONITOR		"Monitor"								$(check_test "MODULE_MONITOR") \
+		WITH_LB				"Loadbalancing"							$(check_test "WITH_LB") \
+		CS_CACHEEX			"Cache exchange"						$(check_test "CS_CACHEEX") \
+		CW_CYCLE_CHECK		"CW Cycle Check"						$(check_test "CW_CYCLE_CHECK") \
+		LCDSUPPORT			"LCD support"							$(check_test "LCDSUPPORT") \
+		LEDSUPPORT			"LED support"							$(check_test "LEDSUPPORT") \
+		CLOCKFIX			"Clockfix (disable on old systems!)"	$(check_test "CLOCKFIX") \
+		IPV6SUPPORT			"IPv6 support (experimental)"			$(check_test "IPV6SUPPORT") \
 		2> ${tempfile}
 
 	opt=${?}
@@ -430,18 +468,19 @@ menu_addons() {
 
 menu_protocols() {
 	${DIALOG} --checklist "\nChoose protocols:\n " $height $width $listheight \
-		MODULE_CAMD33		"camd 3.3"		$(check_test "MODULE_CAMD33") \
-		MODULE_CAMD35		"camd 3.5 UDP"	        $(check_test "MODULE_CAMD35") \
-		MODULE_CAMD35_TCP	"camd 3.5 TCP"	        $(check_test "MODULE_CAMD35_TCP") \
-		MODULE_NEWCAMD		"newcamd"		$(check_test "MODULE_NEWCAMD") \
-		MODULE_CCCAM		"CCcam"			$(check_test "MODULE_CCCAM") \
-		MODULE_CCCSHARE		"CCcam share"	$(check_test "MODULE_CCCSHARE") \
-		MODULE_GBOX		"gbox"  		$(check_test "MODULE_GBOX") \
-		MODULE_RADEGAST		"radegast"		$(check_test "MODULE_RADEGAST") \
-		MODULE_SERIAL		"Serial"		$(check_test "MODULE_SERIAL") \
-		MODULE_CONSTCW		"constant CW"	        $(check_test "MODULE_CONSTCW") \
-		MODULE_PANDORA		"Pandora"		$(check_test "MODULE_PANDORA") \
-		MODULE_GHTTP		"Ghttp"			$(check_test "MODULE_GHTTP") \
+		MODULE_CAMD33		"camd 3.3"			$(check_test "MODULE_CAMD33") \
+		MODULE_CAMD35		"camd 3.5 UDP"		$(check_test "MODULE_CAMD35") \
+		MODULE_CAMD35_TCP	"camd 3.5 TCP"		$(check_test "MODULE_CAMD35_TCP") \
+		MODULE_NEWCAMD		"newcamd"			$(check_test "MODULE_NEWCAMD") \
+		MODULE_CCCAM		"CCcam"				$(check_test "MODULE_CCCAM") \
+		MODULE_CCCSHARE		"CCcam share"		$(check_test "MODULE_CCCSHARE") \
+		MODULE_GBOX			"gbox"				$(check_test "MODULE_GBOX") \
+		MODULE_RADEGAST		"radegast"			$(check_test "MODULE_RADEGAST") \
+		MODULE_SERIAL		"Serial"			$(check_test "MODULE_SERIAL") \
+		MODULE_CONSTCW		"constant CW"		$(check_test "MODULE_CONSTCW") \
+		MODULE_PANDORA		"Pandora"			$(check_test "MODULE_PANDORA") \
+		MODULE_GHTTP		"Ghttp"				$(check_test "MODULE_GHTTP") \
+		MODULE_SCAM			"scam"				$(check_test "MODULE_SCAM") \
 		2> ${tempfile}
 
 	opt=${?}
@@ -477,13 +516,16 @@ menu_readers() {
 
 menu_card_readers() {
 	${DIALOG} --checklist "\nChoose card reader drivers:\n " $height $width $listheight \
-		CARDREADER_PHOENIX	"Phoenix/mouse"				$(check_test "CARDREADER_PHOENIX") \
-		CARDREADER_INTERNAL	"Internal (Sci,Azbox,Cool)"	$(check_test "CARDREADER_INTERNAL") \
-		CARDREADER_SC8IN1	"SC8in1"					$(check_test "CARDREADER_SC8IN1") \
-		CARDREADER_MP35		"AD-Teknik MP 3.6/USB Phoenix"						$(check_test "CARDREADER_MP35") \
-		CARDREADER_SMARGO	"Argolis Smargo Smartreader"					$(check_test "CARDREADER_SMARGO") \
-		CARDREADER_DB2COM	"dbox2"						$(check_test "CARDREADER_DB2COM") \
-		CARDREADER_STAPI	"STAPI"						$(check_test "CARDREADER_STAPI") \
+		CARDREADER_PHOENIX	"Phoenix/mouse"					$(check_test "CARDREADER_PHOENIX") \
+		CARDREADER_INTERNAL	"Internal (Sci,Azbox,Cool)"		$(check_test "CARDREADER_INTERNAL") \
+		CARDREADER_SC8IN1	"SC8in1"						$(check_test "CARDREADER_SC8IN1") \
+		CARDREADER_MP35		"AD-Teknik MP 3.6/USB Phoenix"	$(check_test "CARDREADER_MP35") \
+		CARDREADER_SMARGO	"Argolis Smargo Smartreader"	$(check_test "CARDREADER_SMARGO") \
+		CARDREADER_DB2COM	"dbox2"							$(check_test "CARDREADER_DB2COM") \
+		CARDREADER_STAPI	"STAPI"							$(check_test "CARDREADER_STAPI") \
+		CARDREADER_STAPI5	"STAPI5"						$(check_test "CARDREADER_STAPI5") \
+		CARDREADER_STINGER	"STINGER"						$(check_test "CARDREADER_STINGER") \
+		CARDREADER_DRECAS	"DRECAS"						$(check_test "CARDREADER_DRECAS") \
 	2> ${tempfile}
 
 	opt=${?}
@@ -532,6 +574,7 @@ config_dialog() {
 			Save)
 				print_components
 				update_deps
+				write_enabled
 				exit 0
 			;;
 		esac
@@ -557,6 +600,12 @@ do
 	'-s'|'--show-enabled'|'--show')
 		shift
 		list_enabled $(get_opts $1)
+		# Take special care of USE_xxx flags
+		if [ "$1" = "card_readers" ]
+		then
+			have_flag USE_LIBUSB && echo "CARDREADER_SMART"
+			have_flag USE_PCSC && echo "CARDREADER_PCSC"
+		fi
 		break
 		;;
 	'-Z'|'--show-disabled')
@@ -591,6 +640,7 @@ do
 			shift
 		done
 		update_deps
+		write_enabled
 		;;
 	'-D'|'--disable')
 		shift
@@ -611,6 +661,7 @@ do
 			shift
 		done
 		update_deps
+		write_enabled
 		;;
 	'-R'|'--restore')
 		echo $defconfig | sed -e 's|# ||g' | xargs printf "%s\n" | grep "=y$" | sed -e 's|^CONFIG_||g;s|=.*||g' |
@@ -624,6 +675,7 @@ do
 			disable_opt "$OPT"
 		done
 		update_deps
+		write_enabled
 		;;
 	'-e'|'--enabled')
 		enabled $2 && echo "Y" && exit 0 || echo "N" && exit 1
@@ -643,8 +695,9 @@ do
 	;;
 	'-O'|'--detect-osx-sdk-version')
 		shift
-		OSX_VER=${1:-10.8}
-		for DIR in /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX{$OSX_VER,10.8,10.7}.sdk /Developer/SDKs/MacOSX{$OSX_VER,10.6,10.5}.sdk
+		OSX_VER=${1:-10.10}
+		for DIR in /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX{$OSX_VER,10.10,10.9,10.8,10.7}.sdk /Developer/SDKs/MacOSX{$OSX_VER,10.6,10.5}.sdk
+
 		do
 			if test -d $DIR
 			then

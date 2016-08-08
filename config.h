@@ -2,11 +2,15 @@
 #define CONFIG_H_
 
 #define WEBIF 1
+#define WEBIF_LIVELOG 1
+#define WEBIF_JQUERY 1
 #define TOUCH 1
 //#define WITH_SSL 1
-#if defined(__linux__)
+#if defined(__linux__) || defined(__CYGWIN__)
 #define HAVE_DVBAPI 1
 #endif
+#define READ_SDT_CHARSETS 1
+#define CLOCKFIX 1
 #define IRDETO_GUESSING 1
 #define CS_ANTICASC 1
 #define WITH_DEBUG 1
@@ -16,8 +20,8 @@
 //#define LCDSUPPORT 1
 //#define LEDSUPPORT 1
 //#define IPV6SUPPORT 1
-
 #define MODULE_MONITOR 1
+
 //#define MODULE_CAMD33 1
 #define MODULE_CAMD35 1
 #define MODULE_CAMD35_TCP 1
@@ -29,7 +33,8 @@
 #define MODULE_SERIAL 1
 #define MODULE_CONSTCW 1
 #define MODULE_PANDORA 1
-//#define MODULE_GHTTP 1
+#define MODULE_GHTTP 1
+#define MODULE_SCAM 1
 
 #define WITH_CARDREADER 1
 
@@ -54,6 +59,8 @@
 #define CARDREADER_SC8IN1 1
 #define CARDREADER_SMARGO 1
 #define CARDREADER_DB2COM 1
+#define CARDREADER_STINGER 1
+#define CARDREADER_DRECAS 1
 
 #ifdef WITH_PCSC
 #define CARDREADER_PCSC 1
@@ -65,16 +72,26 @@
 
 // CARDREADER_INTERNAL_{AZBOX,COOLAPI,SCI} are internal variables
 // do not touch them
-#if   defined(CARDREADER_INTERNAL) && defined(WITH_AZBOX)
+#if (defined(CARDREADER_INTERNAL) && defined(WITH_AZBOX))
 #define CARDREADER_INTERNAL_AZBOX 1
-#elif defined(CARDREADER_INTERNAL) && defined(WITH_COOLAPI)
+#elif (defined(CARDREADER_INTERNAL) && (defined(WITH_COOLAPI) || defined(WITH_SU980)))
 #define CARDREADER_INTERNAL_COOLAPI 1
+#elif defined(CARDREADER_INTERNAL) && defined(WITH_COOLAPI2)
+#define CARDREADER_INTERNAL_COOLAPI2 1
 #elif defined(CARDREADER_INTERNAL)
 #define CARDREADER_INTERNAL_SCI 1
 #endif
 
 #ifdef WITH_STAPI
 #define CARDREADER_STAPI 1
+#endif
+
+#ifdef WITH_STAPI5
+#define CARDREADER_STAPI5 1
+#endif
+
+#ifdef READER_DRE
+#define READER_DRECAS 1
 #endif
 
 #endif // WITH_CARDREADER
