@@ -3,8 +3,7 @@ plat=i686-pc-linux
 plat_dir=build_i686Linux
 rm -f oscam oscam-$plat-svn*.tar.gz
 
-make clean
-cmake  -DCS_CONFDIR=/var/etc -DWEBIF=1 ..    #用cmake命令对源码进行交叉编译
+cmake  -DCS_CONFDIR=/var/etc --clean-first -DWEBIF=1 ..    #用cmake命令对源码进行交叉编译
 make
 
 [ -d image/usr/bin ] || mkdir -p image/usr/bin
@@ -15,9 +14,12 @@ builddir=`dirname $0`
 [ "$builddir" = "." ] && svnroot=".."
 [ "$builddir" = "." ] || svnroot=`dirname $builddir`
 cd $svnroot/
-svnver=`git svn info | sed -n "5p"| sed -e "s/ //g" | cut -f2 -d:`
+svninfo=$(git svn info 2>/dev/null)
+if [ "$svninfo" != "" ]; then
+	svnver=_svn`echo $svninfo | sed -n "5p"| sed -e "s/ //g" | cut -f2 -d:`
+fi
 cd ${plat_dir}/image
-tar czf ../oscam-${plat}-svn${svnver}-nx111-`date +%Y%m%d`.tar.gz *
+tar czf ../oscam-${plat}${svnver}-nx111-`date +%Y%m%d`.tar.gz *
 cd ../ 
 rm -rf CMake* *.a Makefile cscrypt csctapi *.cmake config.* 
 rm -rf minilzo utils algo image/var/bin/oscam
