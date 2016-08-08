@@ -609,7 +609,7 @@ select {
 }
 /* settings for select in script.html */
 #scriptselect {
-	height: 22px
+	height: 32px
 }
 /* generaly settings for all input */
 input,textarea {
