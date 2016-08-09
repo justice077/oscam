@@ -2567,6 +2567,10 @@ int32_t dvbapi_write_prio() {
 	return 0;
 }
 
+void dvbapi_cleanup(struct s_client* UNUSED(cl)){
+	dvbapi_write_prio();
+}
+
 void dvbapi_adjust_prioritytab(int32_t demux_index){
 	int32_t n;
 	int8_t k,idx;
@@ -7482,6 +7486,7 @@ void module_dvbapi(struct s_module *ph)
 	ph->desc = "dvbapi";
 	ph->type = MOD_CONN_SERIAL;
 	ph->listenertype = LIS_DVBAPI;
+	ph->cleanup = dvbapi_cleanup;
 #if defined(WITH_AZBOX)
 	ph->s_handler = azbox_handler;
 	ph->send_dcw = azbox_send_dcw;
