@@ -1,6 +1,7 @@
 #!/bin/sh
 plat=powerpc
 plat_dir=build_powerpc
+TOOLCHAIN=powerpc-tuxbox-linux-gnu
 
 curdir=`pwd`
 builddir=`dirname $0`
@@ -18,10 +19,14 @@ TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 
 ##################################################################
 cd $svnroot/build
-PATH=$TOOLCHAINROOT/powerpc-tuxbox-linux-gnu/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-powerpc-tuxbox.cmake\
+PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=$svnroot/toolchains/toolchain-powerpc-tuxbox.cmake\
 	  --clean-first -DWEBIF=1 \
-	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/powerpc-tuxbox-linux-gnu/powerpc-tuxbox-linux-gnu/include\
+	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/include\
+	  -DOPENSSL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/include\
+	  -DOPENSSL_LIBRARIES=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/lib\
+	  -DOPENSSL_ROOT_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN\
+	  -DWITH_SSL=1\
 	  $svnroot
 
 make

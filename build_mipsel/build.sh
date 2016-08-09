@@ -1,6 +1,7 @@
 #!/bin/sh
 plat=mipsel
 plat_dir=build_mipsel
+TOOLCHAIN=mipsel-unknown-linux-gnu
 
 curdir=`pwd`
 builddir=`dirname $0`
@@ -17,9 +18,13 @@ rm -rf $svnroot/build/*
 TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 ##################################################################
 cd $svnroot/build
-PATH=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-mips-tuxbox.cmake\
-	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/mipsel-unknown-linux-gnu/sys-root/usr/include\
+PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=$svnroot/toolchains/toolchain-mips-tuxbox.cmake\
+	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
+	  -DOPENSSL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
+	  -DOPENSSL_LIBRARIES=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/lib\
+	  -DOPENSSL_ROOT_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/\
+	  -DWITH_SSL=1\
 	  --clean-first\
 	  -DWEBIF=1 $svnroot
 make

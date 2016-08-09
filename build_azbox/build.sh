@@ -1,6 +1,7 @@
 #!/bin/sh
 plat=azbox
 plat_dir=build_azbox
+TOOLCHAIN=mipsel-unknown-linux-gnu
 
 curdir=`pwd`
 builddir=`dirname $0`
@@ -20,7 +21,11 @@ cd $svnroot/build
 PATH=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/bin:$PATH \
    cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-mips-azbox.cmake \
 	  --clean-first -DWEBIF=1 \
-	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/mipsel-unknown-linux-gnu/sys-root/usr/include\
+	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
+	  -DOPENSSL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
+	  -DOPENSSL_LIBRARIES=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/lib\
+	  -DOPENSSL_ROOT_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/\
+	  -DWITH_SSL=1\
 	  $svnroot
 make
 
