@@ -40,7 +40,12 @@ cd $svnroot/build/${plat_dir}
 rm -f oscam oscam-$plat-svn*.tar.gz
 
 cd $svnroot/build/${plat_dir}/image
-tar czf $svnroot/build/oscam-${plat}-r${svnver}-nx111-`date +%Y%m%d`.tar.gz *
+if [ $# -ge 1 -a "$1" = "-debug" ]; then
+	compile_time=$(date +%Y%m%d%H%M)D
+else
+	compile_time=$(date +%Y%m%d)
+fi
+tar czf $svnroot/build/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
 
 rm -rf $svnroot/build/.tmp/*
 cd $curdir
