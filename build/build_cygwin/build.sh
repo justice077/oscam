@@ -4,20 +4,15 @@ plat_dir=build_cygwin
 TOOLCHAIN=i686-pc-cygwin
 
 curdir=`pwd`
-builddir=`dirname $0`
+builddir=$(cd $(dirname $0);pwd)
+svnroot=`pwd`
 
-if [ "$builddir" = "." ]; then
-	cd ..
-	svnroot=`pwd`
-else
-	cd `dirname $builddir`
-	svnroot=`pwd`
-fi
-[ -d $svnroot/build ] || mkdir -p $svnroot/build
-rm -rf $svnroot/build/*
+[ -d $svnroot/build/.tmp ] || mkdir -p $svnroot/build/.tmp
+rm -rf $svnroot/build/.tmp/*
+
 TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 ##################################################################
-cd $svnroot/build
+cd $svnroot/build/.tmp
 PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
    cmake  -DCMAKE_TOOLCHAIN_FILE=$svnroot/toolchains/toolchain-i386-cygwin.cmake\
 	  -DCMAKE_LEGACY_CYGWIN_WIN32=1\
@@ -30,11 +25,12 @@ PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
 	  -DWEBIF=1 $svnroot
 make
 
-cp $svnroot/build/oscam.exe $svnroot/${plat_dir}/
-
+cp $svnroot/build/.tmp/oscam.exe $svnroot/build/${plat_dir}/image/
 ##################################################################
-
 svnver=`$svnroot/config.sh --oscam-revision`
 
-rm -rf $svnroot/build/*
+cd $svnroot/build/${plat_dir}/image
+tar czf $svnroot/build/oscam-${plat}-r${svnver}-nx111-`date +%Y%m%d`.tar.gz *
+
+rm -rf $svnroot/build/.tmp/*
 cd $curdir

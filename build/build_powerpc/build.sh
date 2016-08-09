@@ -4,21 +4,16 @@ plat_dir=build_powerpc
 TOOLCHAIN=powerpc-tuxbox-linux-gnu
 
 curdir=`pwd`
-builddir=`dirname $0`
+builddir=$(cd $(dirname $0);pwd)
+svnroot=`pwd`
 
-if [ "$builddir" = "." ]; then
-	cd ..
-	svnroot=`pwd`
-else
-	cd `dirname $builddir`
-	svnroot=`pwd`
-fi
-[ -d $svnroot/build ] || mkdir -p $svnroot/build
-rm -rf $svnroot/build/*
+[ -d $svnroot/build/.tmp ] || mkdir -p $svnroot/build/.tmp
+rm -rf $svnroot/build/.tmp/*
+
 TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 
 ##################################################################
-cd $svnroot/build
+cd $svnroot/build/.tmp
 PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
    cmake  -DCMAKE_TOOLCHAIN_FILE=$svnroot/toolchains/toolchain-powerpc-tuxbox.cmake\
 	  --clean-first -DWEBIF=1 \
@@ -31,19 +26,15 @@ PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
 
 make
 
-[ -d $svnroot/${plat_dir}/image/var/bin ] || mkdir -p $svnroot/${plat_dir}/image/var/bin
-cp $svnroot/build/oscam $svnroot/${plat_dir}/image/var/bin/
+[ -d $svnroot/build/${plat_dir}/image/var/bin ] || mkdir -p $svnroot/build/${plat_dir}/image/var/bin
+cp $svnroot/build/.tmp/oscam $svnroot/build/${plat_dir}/image/var/bin/
 
 ##################################################################
 
 svnver=`$svnroot/config.sh --oscam-revision`
 
-cd $svnroot/${plat_dir}
-rm -f oscam oscam-$plat-svn*.tar.gz
+cd $svnroot/build/${plat_dir}/image
+tar czf $svnroot/build/oscam-${plat}-r${svnver}-nx111-`date +%Y%m%d`.tar.gz *
 
-cd $svnroot/${plat_dir}/image
-tar czf ../oscam-${plat}-r${svnver}-nx111-`date +%Y%m%d`.tar.gz *
-
-cd $svnroot/${plat_dir}
-rm -rf $svnroot/build/*
+rm -rf $svnroot/build/.tmp/*
 cd $curdir

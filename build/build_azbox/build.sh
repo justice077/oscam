@@ -7,19 +7,19 @@ curdir=`pwd`
 builddir=`dirname $0`
 
 if [ "$builddir" = "." ]; then
-	cd ..
+	cd ../..
 	svnroot=`pwd`
 else
-	cd `dirname $builddir`
+	cd $(dirname $(dirname $builddir))
 	svnroot=`pwd`
 fi
-[ -d $svnroot/build ] || mkdir -p $svnroot/build
-rm -rf $svnroot/build/*
+[ -d $svnroot/build/.tmp ] || mkdir -p $svnroot/build/.tmp
+rm -rf $svnroot/build/.tmp/*
 TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 ##################################################################
-cd $svnroot/build
+cd $svnroot/build/.tmp
 PATH=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-mips-azbox.cmake \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=$svnroot/toolchains/toolchain-mips-azbox.cmake \
 	  --clean-first -DWEBIF=1 \
 	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
 	  -DOPENSSL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
@@ -29,19 +29,18 @@ PATH=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/bin:$PATH \
 	  $svnroot
 make
 
-[ -d $svnroot/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS ] || mkdir -p $svnroot/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS
-cp $svnroot/build/oscam $svnroot/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS/
+[ -d $svnroot/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS ] || mkdir -p $svnroot/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS
+cp $svnroot/build/.tmp/oscam $svnroot/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS/
 
 ##################################################################
 
 svnver=`$svnroot/config.sh --oscam-revision`
 
-cd $svnroot/${plat_dir}
+cd $svnroot/build/${plat_dir}
 rm -f oscam oscam-$plat-svn*.tar.gz
 
-cd $svnroot/${plat_dir}/image
-tar czf ../oscam-${plat}-r${svnver}-nx111-`date +%Y%m%d`.tar.gz *
+cd $svnroot/build/${plat_dir}/image
+tar czf $svnroot/build/oscam-${plat}-r${svnver}-nx111-`date +%Y%m%d`.tar.gz *
 
-cd $svnroot/${plat_dir}
-rm -rf $svnroot/build/*
+rm -rf $svnroot/build/.tmp/*
 cd $curdir
