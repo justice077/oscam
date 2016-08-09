@@ -14,11 +14,16 @@ else
 fi
 [ -d $svnroot/build ] || mkdir -p $svnroot/build
 rm -rf $svnroot/build/*
+TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 
 ##################################################################
 cd $svnroot/build
-PATH=../../toolchains/powerpc-tuxbox-linux-gnu/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-powerpc-tuxbox.cmake --clean-first -DWEBIF=1 $svnroot    #用cmake命令对源码进行交叉编译
+PATH=$TOOLCHAINROOT/powerpc-tuxbox-linux-gnu/bin:$PATH \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-powerpc-tuxbox.cmake\
+	  --clean-first -DWEBIF=1 \
+	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/powerpc-tuxbox-linux-gnu/powerpc-tuxbox-linux-gnu/include\
+	  $svnroot
+
 make
 
 [ -d $svnroot/${plat_dir}/image/var/bin ] || mkdir -p $svnroot/${plat_dir}/image/var/bin

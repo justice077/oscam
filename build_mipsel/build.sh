@@ -14,11 +14,14 @@ else
 fi
 [ -d $svnroot/build ] || mkdir -p $svnroot/build
 rm -rf $svnroot/build/*
-
+TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 ##################################################################
 cd $svnroot/build
-PATH=../../toolchains/mipsel-unknown-linux-gnu/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-mips-tuxbox.cmake --clean-first -DWEBIF=1 $svnroot    #用cmake命令对源码进行交叉编译
+PATH=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/bin:$PATH \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-mips-tuxbox.cmake\
+	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/mipsel-unknown-linux-gnu/sys-root/usr/include\
+	  --clean-first\
+	  -DWEBIF=1 $svnroot
 make
 
 [ -d $svnroot/${plat_dir}/image/usr/bin ] || mkdir -p $svnroot/${plat_dir}/image/usr/bin

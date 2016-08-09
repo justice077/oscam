@@ -14,11 +14,14 @@ else
 fi
 [ -d $svnroot/build ] || mkdir -p $svnroot/build
 rm -rf $svnroot/build/*
-
+TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 ##################################################################
 cd $svnroot/build
-PATH=../../toolchains/mipsel-unknown-linux-gnu/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-mips-azbox.cmake --clean-first -DWEBIF=1 $svnroot    #用cmake命令对源码进行交叉编译
+PATH=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/bin:$PATH \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=../toolchains/toolchain-mips-azbox.cmake \
+	  --clean-first -DWEBIF=1 \
+	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/mipsel-unknown-linux-gnu/sys-root/usr/include\
+	  $svnroot
 make
 
 [ -d $svnroot/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS ] || mkdir -p $svnroot/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS

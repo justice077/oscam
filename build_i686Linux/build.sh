@@ -14,11 +14,12 @@ else
 fi
 [ -d $svnroot/build ] || mkdir -p $svnroot/build
 rm -rf $svnroot/build/*
+TOOLCHAINROOT=$(dirname $svnroot)/toolchains
 
 ##################################################################
 cd $svnroot/build
-
-cmake  -DCS_CONFDIR=/var/etc --clean-first -DWEBIF=1 $svnroot    #用cmake命令对源码进行交叉编译
+cmake  -DCS_CONFDIR=/var/etc --clean-first -DWEBIF=1 \
+	  $svnroot
 make
 
 [ -d $svnroot/${plat_dir}/image/usr/bin ] || mkdir -p $svnroot/${plat_dir}/image/usr/bin
