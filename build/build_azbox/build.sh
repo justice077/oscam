@@ -8,44 +8,44 @@ builddir=`dirname $0`
 
 if [ "$builddir" = "." ]; then
 	cd ../..
-	svnroot=`pwd`
+	ROOT=`pwd`
 else
 	cd $(dirname $(dirname $builddir))
-	svnroot=`pwd`
+	ROOT=`pwd`
 fi
-[ -d $svnroot/build/.tmp ] || mkdir -p $svnroot/build/.tmp
-rm -rf $svnroot/build/.tmp/*
-TOOLCHAINROOT=$(dirname $svnroot)/toolchains
+[ -d $ROOT/build/.tmp ] || mkdir -p $ROOT/build/.tmp
+rm -rf $ROOT/build/.tmp/*
+TOOLCHAINROOT=$(dirname $ROOT)/toolchains
 ##################################################################
-cd $svnroot/build/.tmp
+cd $ROOT/build/.tmp
 PATH=$TOOLCHAINROOT/mipsel-unknown-linux-gnu/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=$svnroot/toolchains/toolchain-mips-azbox.cmake \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-mips-azbox.cmake \
 	  --clean-first -DWEBIF=1 \
 	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
 	  -DOPENSSL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
 	  -DOPENSSL_LIBRARIES=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/lib\
 	  -DOPENSSL_ROOT_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/\
 	  -DWITH_SSL=1\
-	  $svnroot
+	  $ROOT
 make
 
-[ -d $svnroot/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS ] || mkdir -p $svnroot/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS
-cp $svnroot/build/.tmp/oscam $svnroot/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS/
+[ -d $ROOT/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS ] || mkdir -p $ROOT/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS
+cp $ROOT/build/.tmp/oscam $ROOT/build/${plat_dir}/image/PLUGINS/OpenXCAS/oscamCAS/
 
 ##################################################################
 
-svnver=`$svnroot/config.sh --oscam-revision`
+svnver=`$ROOT/config.sh --oscam-revision`
 
-cd $svnroot/build/${plat_dir}
+cd $ROOT/build/${plat_dir}
 rm -f oscam oscam-$plat-svn*.tar.gz
 
-cd $svnroot/build/${plat_dir}/image
+cd $ROOT/build/${plat_dir}/image
 if [ $# -ge 1 -a "$1" = "-debug" ]; then
 	compile_time=$(date +%Y%m%d%H%M)D
 else
 	compile_time=$(date +%Y%m%d)
 fi
-tar czf $svnroot/build/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
+tar czf $ROOT/build/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
 
-rm -rf $svnroot/build/.tmp/*
+rm -rf $ROOT/build/.tmp/*
 cd $curdir

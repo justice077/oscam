@@ -5,16 +5,16 @@ TOOLCHAIN=i686-pc-cygwin
 
 curdir=`pwd`
 builddir=$(cd $(dirname $0);pwd)
-svnroot=`pwd`
+ROOT=`pwd`
 
-[ -d $svnroot/build/.tmp ] || mkdir -p $svnroot/build/.tmp
-rm -rf $svnroot/build/.tmp/*
+[ -d $ROOT/build/.tmp ] || mkdir -p $ROOT/build/.tmp
+rm -rf $ROOT/build/.tmp/*
 
-TOOLCHAINROOT=$(dirname $svnroot)/toolchains
+TOOLCHAINROOT=$(dirname $ROOT)/toolchains
 ##################################################################
-cd $svnroot/build/.tmp
+cd $ROOT/build/.tmp
 PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=$svnroot/toolchains/toolchain-i386-cygwin.cmake\
+   cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-i386-cygwin.cmake\
 	  -DCMAKE_LEGACY_CYGWIN_WIN32=1\
 	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/include\
 	  -DOPENSSL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/include\
@@ -22,20 +22,20 @@ PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
 	  -DOPENSSL_ROOT_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/\
 	  -DWITH_SSL=1\
 	  --clean-first\
-	  -DWEBIF=1 $svnroot
+	  -DWEBIF=1 $ROOT
 make
 
-cp $svnroot/build/.tmp/oscam.exe $svnroot/build/${plat_dir}/image/
+cp $ROOT/build/.tmp/oscam.exe $ROOT/build/${plat_dir}/image/
 ##################################################################
-svnver=`$svnroot/config.sh --oscam-revision`
+svnver=`$ROOT/config.sh --oscam-revision`
 
-cd $svnroot/build/${plat_dir}/image
+cd $ROOT/build/${plat_dir}/image
 if [ $# -ge 1 -a "$1" = "-debug" ]; then
 	compile_time=$(date +%Y%m%d%H%M)D
 else
 	compile_time=$(date +%Y%m%d)
 fi
-tar czf $svnroot/build/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
+tar czf $ROOT/build/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
 
-rm -rf $svnroot/build/.tmp/*
+rm -rf $ROOT/build/.tmp/*
 cd $curdir
