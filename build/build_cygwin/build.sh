@@ -47,6 +47,7 @@ cd $ROOT/build/.tmp
 cp $ROOT/config.h $ROOT/config.h.orig
 
 PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
+LD_LIBRARY_PATH=$TOOLCHAINROOT/$TOOLCHAIN/lib \
    cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-i386-cygwin.cmake\
 	  -DCMAKE_LEGACY_CYGWIN_WIN32=1\
 	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/include\
@@ -56,9 +57,11 @@ PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
 	  -DWITH_SSL=1\
 	  --clean-first\
 	  -DWEBIF=1 $ROOT
+LD_LIBRARY_PATH=$TOOLCHAINROOT/$TOOLCHAIN/lib \
 make
-[ -f $ROOT/config.h.orig ] && mv $ROOT/config.h.orig $ROOT/config.h
 
+[ -f $ROOT/config.h.orig ] && mv $ROOT/config.h.orig $ROOT/config.h
+[ ! -d ${builddir}/image ] && mkdir ${builddir}/image
 cp $ROOT/build/.tmp/oscam.exe ${builddir}/image/
 ##################################################################
 svnver=`$ROOT/config.sh --oscam-revision`
