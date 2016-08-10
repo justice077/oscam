@@ -9,7 +9,7 @@ curdir=`pwd`
 builddir=`cd $(dirname $0);pwd`
 
 if [ "${OSCAM_SRC}" != "" -a -f ${OSCAM_SRC}/oscam.c ]; then
-	ROOT=${OSCAM_SRC}
+	ROOT=$(cd ${OSCAM_SRC};pwd)
 elif [ -f $(dirname $(dirname $builddir))/oscam.c ]; then
 	ROOT=$(dirname $(dirname $builddir))
 else
