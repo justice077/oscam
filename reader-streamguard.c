@@ -161,7 +161,7 @@ static int32_t streamguard_do_emm(struct s_reader *reader, EMM_PACKET *ep)
 
   if(ep->emm[2] < 5) return ERROR;
 
-  write_len = ep->emm[2] + 3;
+  write_len =  SCT_LEN(ep->emm);
   emm_cmd[4] = write_len;
   memcpy(emm_cmd + 5, ep->emm, write_len);
 
