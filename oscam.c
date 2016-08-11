@@ -450,6 +450,7 @@ static void write_versionfile(bool use_stdout)
 		write_readerconf(READER_VIDEOGUARD, "NDS Videoguard");
 		write_readerconf(READER_DRE, "DRE Crypt");
 		write_readerconf(READER_TONGFANG, "TONGFANG");
+		write_readerconf(READER_STREAMGUARD, "StreamGuard");
 		write_readerconf(READER_BULCRYPT, "Bulcrypt");
 		write_readerconf(READER_GRIFFIN, "Griffin");
 		write_readerconf(READER_DGCRYPT, "DGCrypt");
@@ -1592,7 +1593,7 @@ const struct s_cardsystem *cardsystems[] =
 	&reader_tongfang,
 #endif
 #ifdef READER_STREAMGUARD
-	reader_streamguard,
+	&reader_streamguard,
 #endif
 #ifdef READER_BULCRYPT
 	&reader_bulcrypt,

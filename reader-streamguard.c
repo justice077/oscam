@@ -140,13 +140,13 @@ static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er
     memcpy(ea->cw + 12, pbuf + 6 + 8 + 4 + 1 + 1, 4);
   }
 
-  return TRUE;
+  return OK;
 }
 
 static int32_t streamguard_get_emm_type(EMM_PACKET *ep, struct s_reader *UNUSED(reader))
 {
   ep->type = UNKNOWN;
-  return TRUE;
+  return 1;
 }
 
 void streamguard_get_emm_filter(struct s_reader *UNUSED(reader), uchar *UNUSED(filter))
@@ -175,14 +175,15 @@ static int32_t streamguard_card_info(struct s_reader * UNUSED(reader))
   return OK;
 }
 
-void reader_streamguard(struct s_cardsystem *ph) 
+const struct s_cardsystem reader_streamguard =
 {
-	ph->do_emm=streamguard_do_emm;
-	ph->do_ecm=streamguard_do_ecm;
-	ph->card_info=streamguard_card_info;
-	ph->card_init=streamguard_card_init;
-	ph->get_emm_type=streamguard_get_emm_type;
-	ph->caids[0]=0x4A;
-	ph->desc="streamguard";
-}
+	.desc         = "streamguard",
+	.caids        = (uint16_t[]){ 0x4A, 0 },
+	.do_emm       = streamguard_do_emm,
+	.do_ecm       = streamguard_do_ecm,
+	.card_info    = streamguard_card_info,
+	.card_init    = streamguard_card_init,
+	.get_emm_type = streamguard_get_emm_type,
+};
+
 #endif
