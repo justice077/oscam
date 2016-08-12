@@ -19,6 +19,12 @@ else
 	exit
 fi
 
+#### parse option ########3
+for op in "$@"; do
+   [ "$op" = "-debug" ] && debug=1
+   [ "$op" = "-base" ] && base=1
+done
+
 # fix config.sh for subverison changed to git
 if [ -f $ROOT/config.sh ]; then
 	cp $ROOT/config.sh $ROOT/config.sh.orig
@@ -45,9 +51,9 @@ fi
 ##################################################################
 cd $ROOT/build/.tmp
 cp $ROOT/config.h $ROOT/config.h.orig
-
-PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
-LD_LIBRARY_PATH=$TOOLCHAINROOT/$TOOLCHAIN/lib \
+if [ "$base" = "" ]; then
+   LD_LIBRARY_PATH=$TOOLCHAINROOT/$TOOLCHAIN/lib \
+   PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
    cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-i386-cygwin.cmake\
 	  -DCMAKE_LEGACY_CYGWIN_WIN32=1\
 	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/include\
@@ -57,11 +63,22 @@ LD_LIBRARY_PATH=$TOOLCHAINROOT/$TOOLCHAIN/lib \
 	  -DWITH_SSL=1\
 	  --clean-first\
 	  -DWEBIF=1 $ROOT
+   feature=-pcsc-ssl
+else
+   LD_LIBRARY_PATH=$TOOLCHAINROOT/$TOOLCHAIN/lib \
+   PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
+   cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-i386-cygwin.cmake \
+	  --clean-first\
+	  -DWITH_SSL=0 \
+	  -DHAVE_PCSC=0 \
+	  -DWEBIF=1 $ROOT
+fi
+
 LD_LIBRARY_PATH=$TOOLCHAINROOT/$TOOLCHAIN/lib \
 make
-
 [ -f $ROOT/config.h.orig ] && mv $ROOT/config.h.orig $ROOT/config.h
-[ ! -d ${builddir}/image ] && mkdir ${builddir}/image
+
+[ -d ${builddir}/image ] || mkdir ${builddir}/image
 cp $ROOT/build/.tmp/oscam.exe ${builddir}/image/
 ##################################################################
 svnver=`$ROOT/config.sh --oscam-revision`
@@ -74,7 +91,7 @@ if [ $# -ge 1 -a "$1" = "-debug" ]; then
 else
 	compile_time=$(date +%Y%m%d)
 fi
-tar czf $(dirname $builddir)/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
+tar czf $(dirname $builddir)/oscam-${plat}-r${svnver}${feature}-nx111-${compile_time}.tar.gz *
 
 rm -rf $ROOT/build/.tmp/*
 cd $curdir
