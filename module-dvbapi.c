@@ -2554,7 +2554,7 @@ int32_t dvbapi_write_prio() {
 				break;
 			case 'p':
 				if(p->force)
-					fprintf(fp, " %1d", p->force);
+					fprintf(fp, " %1d:%1d", p->force,p->pidx - 1);
 				break;
 			case 'm':
 				if(p->mapcaid || p->mapprovid)
