@@ -8,6 +8,8 @@ TOOLCHAIN=mipsel-unknown-linux-gnu
 curdir=`pwd`
 builddir=`cd $(dirname $0);pwd`
 
+[ -f $curdir/oscam.c -a -f $curdir/module-dvbapi.c ] && OSCAM_SRC=$curdir
+
 if [ "${OSCAM_SRC}" != "" -a -f ${OSCAM_SRC}/oscam.c ]; then
 	ROOT=$(cd ${OSCAM_SRC};pwd)
 elif [ -f $(dirname $(dirname $builddir))/oscam.c ]; then
@@ -17,12 +19,6 @@ else
 	cd $curdir
 	exit
 fi
-
-#### parse option ########3
-for op in "$@"; do
-   [ "$op" = "-debug" ] && debug=1
-   [ "$op" = "-base" ] && base=1
-done
 
 # fix config.sh for subverison changed to git
 if [ -f $ROOT/config.sh ]; then
@@ -49,12 +45,9 @@ if [ ! -f $TOOLCHAINROOT/$TOOLCHAIN/bin/$TOOLCHAIN-gcc ]; then
 fi
 ##################################################################
 cd $ROOT/build/.tmp
-cp $ROOT/config.h $ROOT/config.h.orig
-cp $ROOT/toolchains/toolchain-mips-azbox.cmake $ROOT/toolchains/toolchain-mips-azbox.cmake.orig
-sed -e "s/\(.*CMAKE_C_COMPILER \).*)/\1mipsel-unknown-linux-gnu-gcc)/" -i $ROOT/toolchains/toolchain-mips-azbox.cmake
+[ -f $ROOT/config.h ] && cp $ROOT/config.h $ROOT/config.h.orig
 
-if [ "$base" = "" ]; then
-   PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
+PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
    cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-mips-azbox.cmake \
 	  --clean-first -DWEBIF=1 \
 	  -DOPTIONAL_INCLUDE_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/include\
@@ -63,18 +56,9 @@ if [ "$base" = "" ]; then
 	  -DOPENSSL_ROOT_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN/sys-root/usr/\
 	  -DWITH_SSL=1\
 	  $ROOT
-   feature=-pcsc-ssl
-else
-   PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
-   cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-mips-azbox.cmake \
-	  --clean-first\
-	  -DWITH_SSL=0 \
-	  -DHAVE_PCSC=0 \
-	  -DWEBIF=1 $ROOT
-fi
 make
 [ -f $ROOT/config.h.orig ] && mv $ROOT/config.h.orig $ROOT/config.h
-[ -f $ROOT/toolchains/toolchain-mips-azbox.cmake.orig ] && mv $ROOT/toolchains/toolchain-mips-azbox.cmake.orig $ROOT/toolchains/toolchain-mips-azbox.cmake
+
 [ -d ${builddir}/image/PLUGINS/OpenXCAS/oscamCAS ] || mkdir -p ${builddir}/image/PLUGINS/OpenXCAS/oscamCAS
 cp $ROOT/build/.tmp/oscam ${builddir}/image/PLUGINS/OpenXCAS/oscamCAS/
 
@@ -90,7 +74,7 @@ if [ $# -ge 1 -a "$1" = "-debug" ]; then
 else
 	compile_time=$(date +%Y%m%d)
 fi
-tar czf $(dirname $builddir)/oscam-${plat}-r${svnver}${feature}-nx111-${compile_time}.tar.gz *
+tar czf $(dirname $builddir)/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
 
 rm -rf $ROOT/build/.tmp/*
 cd $curdir

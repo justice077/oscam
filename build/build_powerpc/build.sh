@@ -8,6 +8,8 @@ TOOLCHAIN=powerpc-tuxbox-linux-gnu
 curdir=`pwd`
 builddir=`cd $(dirname $0);pwd`
 
+[ -f $curdir/oscam.c -a -f $curdir/module-dvbapi.c ] && OSCAM_SRC=$curdir
+
 if [ "${OSCAM_SRC}" != "" -a -f ${OSCAM_SRC}/oscam.c ]; then
 	ROOT=$(cd ${OSCAM_SRC};pwd)
 elif [ -f $(dirname $(dirname $builddir))/oscam.c ]; then
@@ -48,7 +50,7 @@ if [ ! -f $TOOLCHAINROOT/$TOOLCHAIN/bin/$TOOLCHAIN-gcc ]; then
 fi
 ##################################################################
 cd $ROOT/build/.tmp
-cp $ROOT/config.h $ROOT/config.h.orig
+[ -f $ROOT/config.h ] && cp $ROOT/config.h $ROOT/config.h.orig
 
 if [ "$base" = "" ]; then
    PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
@@ -60,13 +62,10 @@ if [ "$base" = "" ]; then
 	  -DOPENSSL_ROOT_DIR=$TOOLCHAINROOT/$TOOLCHAIN/$TOOLCHAIN\
 	  -DWITH_SSL=1\
 	  $ROOT
-   feature=-pcsc-ssl
 else
    PATH=$TOOLCHAINROOT/$TOOLCHAIN/bin:$PATH \
    cmake  -DCMAKE_TOOLCHAIN_FILE=$ROOT/toolchains/toolchain-powerpc-tuxbox.cmake\
 	  --clean-first -DWEBIF=1 \
-	  -DWITH_SSL=0 \
-	  -DHAVE_PCSC=0 \
 	  $ROOT
 fi
 
@@ -87,7 +86,7 @@ if [ $# -ge 1 -a "$1" = "-debug" ]; then
 else
 	compile_time=$(date +%Y%m%d)
 fi
-tar czf $(dirname $builddir)/oscam-${plat}-r${svnver}${feature}-nx111-${compile_time}.tar.gz *
+tar czf $(dirname $builddir)/oscam-${plat}-r${svnver}-nx111-${compile_time}.tar.gz *
 
 rm -rf $ROOT/build/.tmp/*
 cd $curdir
