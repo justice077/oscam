@@ -35,10 +35,8 @@ static int32_t streamguard_card_init(struct s_reader *reader, ATR* newatr)
 {
 	uchar get_ppua_cmd[7] = {0x00,0xa4,0x04,0x00,0x02,0x3f,0x00};
 	uchar get_serial_cmd[11] = {0x00,0xb2,0x00,0x05,0x06,0x00,0x01,0xff,0x00,0x01,0xff};
-	uchar unknown_cmd1[5] = {0x00,0x84,0x00,0x00,0x08};
-	uchar unknown_cmd2[11] = {0x00,0x20,0x04,0x02,0x06,0x12,0x34,0x56,0x78,0x00,0x00};
-	uchar unknown_cmd3[12] = {0x00,0xb2,0x00,0x06,0x07,0x00,0x05,0xff,0x00,0x02,0xff,0xff};
-	uchar unknown_cmd4[12] = {0x00,0xb2,0x00,0x0d,0x07,0x00,0x01,0x28,0x00,0x02,0x05,0xd2};
+	uchar begin_cmd2[5] = {0x00,0x84,0x00,0x00,0x08};
+	uchar begin_cmd3[11] = {0x00,0x20,0x04,0x02,0x06,0x12,0x34,0x56,0x78,0x00,0x00};
 	uchar pairing_cmd[25] = {0x80,0x5A,0x00,0x00,0x10,0x36,0x9A,0xEE,0x31,0xB2,0xDA,0x94,
 				 0x3D,0xEF,0xBA,0x10,0x22,0x67,0xA5,0x1F,0xFB,0x3B,0x9E,0x1F,0xCB};
 	uchar confirm_pairing_cmd[9] = {0x80,0x5A,0x00,0x01,0x04,0x3B,0x9E,0x1F,0xCB};
@@ -85,7 +83,7 @@ static int32_t streamguard_card_init(struct s_reader *reader, ATR* newatr)
 	}
 
 	if(reader->cas_version > 1){
-		write_cmd(unknown_cmd1, unknown_cmd1 + 5);
+		write_cmd(begin_cmd2, begin_cmd2 + 5);
 		if((cta_res[cta_lr - 2] & 0xf0) == 0x60) {
 			data_len = streamguard_read_data(reader,cta_res[cta_lr - 1], data, &status);
 			if(data_len < 0){
@@ -94,7 +92,7 @@ static int32_t streamguard_card_init(struct s_reader *reader, ATR* newatr)
 			}
 		}
 		else{
-			rdr_log(reader, "error: init unknown_cmd1 failed 1.");
+			rdr_log(reader, "error: init begin_cmd2 failed 1.");
 			return ERROR;
 		}
 	}
@@ -117,49 +115,32 @@ static int32_t streamguard_card_init(struct s_reader *reader, ATR* newatr)
 		memcpy(seed,data + 3, 4);
 		MD5(seed,sizeof(seed),md5_key);
 
-		write_cmd(unknown_cmd1, unknown_cmd1 + 5);
+		write_cmd(begin_cmd2, begin_cmd2 + 5);
 
 		if((cta_res[cta_lr - 2] & 0xf0) != 0x60) {
-			rdr_log(reader, "error: init unknown_cmd1 failed.");
+			rdr_log(reader, "error: init begin cmd2 failed.");
 			return ERROR;
 		}
 
 		data_len = streamguard_read_data(reader,cta_res[cta_lr - 1], data, &status);
 		if(data_len < 0){
-			rdr_log(reader, "error: init read data failed 2.");
+			rdr_log(reader, "error: init read data failed for begin cmd2.");
 			return ERROR;
 		}
 
-		write_cmd(unknown_cmd2, unknown_cmd2 + 5);
+		write_cmd(begin_cmd3, begin_cmd3 + 5);
 		if((cta_res[cta_lr - 2] != 0x90) || (cta_res[cta_lr - 1] != 0x00)){
-			rdr_log(reader, "error: init unknown_cmd2 failed.");
+			rdr_log(reader, "error: init begin cmd3 failed.");
 			return ERROR;
 		}
 
-		write_cmd(unknown_cmd3, unknown_cmd3 + 5);
-		if((cta_res[cta_lr - 2] & 0xf0) != 0x60) {
-			rdr_log(reader, "error: init unknown_cmd3 failed.");
-			return ERROR;
-		}
-		data_len = streamguard_read_data(reader,cta_res[cta_lr - 1], data, &status);
-		if(data_len < 0){
-			rdr_log(reader, "error: init read data failed for unknow_cmd3.");
-			return ERROR;
-		}
-		//unkown_id[0] = data[3];
-		//unkown_id[1] = data[4];
 
-		unknown_cmd4[10] = data[3];
-		unknown_cmd4[11] = data[4];
-		write_cmd(unknown_cmd4, unknown_cmd4 + 5);
-		if((cta_res[cta_lr - 2] & 0xf0) != 0x60) {
-			rdr_log(reader, "error: init unknown_cmd4 failed.");
-			return ERROR;
-		}
-		data_len = streamguard_read_data(reader,cta_res[cta_lr - 1], data, &status);
-		if(data_len < 0){
-			rdr_log(reader, "error: init read data failed for unknow_cmd4.");
-			return ERROR;
+		memcpy(key1, md5_key, 8);
+		memcpy(key2, md5_key + 8, 8);
+		if(reader->cas_version > 2){
+			des_ecb_encrypt(pairing_cmd + 5, key1, 16);  //encrypt
+			des_ecb_decrypt(pairing_cmd + 5, key2, 16);  //decrypt
+			des_ecb_encrypt(pairing_cmd + 5, key1, 16);  //encrypt
 		}
 
 		if(reader->boxid){
@@ -170,6 +151,7 @@ static int32_t streamguard_card_init(struct s_reader *reader, ATR* newatr)
 			boxID[3] = (reader->boxid) & 0xFF;
 			memcpy(pairing_cmd + 21, boxID,4);
 		}
+
 		write_cmd(pairing_cmd, pairing_cmd + 5);
 		if((cta_res[cta_lr - 2] & 0xf0) != 0x60) {
 			rdr_log(reader, "error: init pairing failed.");
@@ -182,8 +164,6 @@ static int32_t streamguard_card_init(struct s_reader *reader, ATR* newatr)
 		}
 
 		//3des decrypt
-		memcpy(key1, md5_key, 8);
-		memcpy(key2, md5_key + 8, 8);
 		des_ecb_decrypt(randkey, key1, sizeof(randkey));  //decrypt
 		des_ecb_encrypt(randkey, key2, sizeof(randkey));  //crypt
 		des_ecb_decrypt(randkey, key1, sizeof(randkey));  //decrypt
@@ -226,7 +206,7 @@ E1 70 71 20 C7 FB 35 B1 EC 32 02 5C 0C 7E 04 CC
 static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er, struct s_ecm_answer *ea)
 {
 	uchar ecm_cmd[200] = {0x80,0x32,0x00,0x00,0x3C};
-	uchar data[100];
+	uchar data[256];
 	int32_t ecm_len;
 	uchar* pbuf;
 	int32_t i = 0;
@@ -319,15 +299,15 @@ static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er
 	}
 
 	if(cid == 0x120 || cid == 0x100 || cid == 0x10A || cid == 0x101 || cid == 0x47){
-	        uchar key1[16]={0xB5, 0xD5, 0xE8, 0x8A, 0x09, 0x98, 0x5E, 0xD0, 0xDA, 0xEE, 0x3E, 0xC3, 0x30, 0xB9, 0xCA, 0x37};
-	        uchar key2[16]={0x5F, 0xE2, 0x76, 0xF8, 0x04, 0xCB, 0x5A, 0x24, 0x79, 0xF9, 0xC9, 0x7F, 0x23, 0x21, 0x45, 0x87};
-	        uchar key3[16]={0xE3, 0x78, 0xB9, 0x8C, 0x74, 0x55, 0xBC, 0xEE, 0x03, 0x85, 0xFD, 0xA0, 0x2A, 0x86, 0xEF, 0xB3};
-		uchar keybuf[22]={ 0xCC,0x65,0xE0, 0xCB,0x60,0x62,0x06,0x33,0x87,0xE3,0xB5,0x2D,0x4B,0x12,0x90,0xD9,0x00,0x00,0x00,0x00,0x00,0x00};
+	        uchar key1[16] = {0xB5, 0xD5, 0xE8, 0x8A, 0x09, 0x98, 0x5E, 0xD0, 0xDA, 0xEE, 0x3E, 0xC3, 0x30, 0xB9, 0xCA, 0x37};
+	        uchar key2[16] = {0x5F, 0xE2, 0x76, 0xF8, 0x04, 0xCB, 0x5A, 0x24, 0x79, 0xF9, 0xC9, 0x7F, 0x23, 0x21, 0x45, 0x87};
+	        uchar key3[16] = {0xE3, 0x78, 0xB9, 0x8C, 0x74, 0x55, 0xBC, 0xEE, 0x03, 0x85, 0xFD, 0xA0, 0x2A, 0x86, 0xEF, 0xB3};
+		uchar keybuf[22] = {0xCC,0x65,0xE0, 0xCB,0x60,0x62,0x06,0x33,0x87,0xE3,0xB5,0x2D,0x4B,0x12,0x90,0xD9,0x00,0x00,0x00,0x00,0x00,0x00};
 		uchar md5key[16];
 		uchar md5tmp[20];
 		uchar deskey1[8], deskey2[8];
 
-		//decrypt_cw_ex(cid, data_len, ((uint16_t)pbuf[2]) << 8 + pbuf[3], cid, ea->cw);
+		//decrypt_cw;
 		if(cid == 0x100)
 			memcpy(keybuf,key1,sizeof(key1));
 		else if(cid == 0x101)
@@ -377,7 +357,7 @@ static int32_t streamguard_do_emm(struct s_reader *reader, EMM_PACKET *ep)
 	def_resp;
 	int32_t len;
 	uint16_t status;
-	uchar data[100];
+	uchar data[256];
 
 	if(SCT_LEN(ep->emm) < 8) {
 		rdr_log(reader, "error: emm data too short !");
@@ -403,8 +383,59 @@ static int32_t streamguard_do_emm(struct s_reader *reader, EMM_PACKET *ep)
 	return OK;
 }
 
-static int32_t streamguard_card_info(struct s_reader * UNUSED(reader))
+static int32_t streamguard_card_info(struct s_reader *reader)
 {
+	uchar get_provid_cmd[12] = {0x00,0xb2,0x00,0x06,0x07,0x00,0x05,0xff,0x00,0x02,0xff,0xff};
+	uchar get_subscription_cmd[12] = {0x00,0xb2,0x00,0x0d,0x07,0x00,0x01,0x28,0x00,0x02,0x05,0xd2};
+	uchar data[256];
+	uint16_t status = 0;
+
+	def_resp;
+
+	write_cmd(get_provid_cmd, get_provid_cmd + 5);
+	if((cta_res[cta_lr - 2] & 0xf0) != 0x60) {
+		rdr_log(reader, "error: get provid  failed.");
+		return ERROR;
+	}
+	int nextReadSize= cta_res[cta_lr - 1];
+	int data_len = streamguard_read_data(reader,nextReadSize, data, &status);
+	if(data_len < 0){
+		rdr_log(reader, "error: read data failed for get provid.");
+		return ERROR;
+	}
+
+	int count = ((nextReadSize - 3) / 46) < 4 ? (nextReadSize - 3) / 46 : 4;
+	int i;
+	for(i = 0; i < count; i++){
+		if(data[i * 46 + 3] != 0xFF && reader->nprov < CS_MAXPROV){
+			reader->prid[reader->nprov][0] = data[i * 46 + 4];
+			reader->prid[reader->nprov][1] = data[i * 46 + 3];
+			reader->nprov++;
+ 			if(i>0 && data[i * 46 + 3] == 0x09 && data[i * 46 + 4] == 0x88){
+				reader->caid = 0x4AD3;
+				break;
+			}
+		}		
+	}
+	int bankid=0;
+	for(i = 0; i < reader->nprov; i++){
+		get_subscription_cmd[5] = bankid;
+		get_subscription_cmd[10] = reader->prid[i][1];
+		get_subscription_cmd[11] = reader->prid[i][0];
+		write_cmd(get_subscription_cmd, get_subscription_cmd + 5);
+		if((cta_res[cta_lr - 2] & 0xf0) != 0x60) {
+			rdr_log(reader, "error:  get subscription failed.");
+			break;
+		}
+		data_len = streamguard_read_data(reader,cta_res[cta_lr - 1], data, &status);
+		if(data_len < 0){
+			rdr_log(reader, "error: read data failed for get subscription.");
+			break;
+		}
+		//streamguard_set_subscription(i,data);  //WIP
+		bankid = data[0];
+	}
+
 	return OK;
 }
 
