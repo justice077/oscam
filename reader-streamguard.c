@@ -18,6 +18,44 @@ static int32_t is_valid(uchar *buf, size_t len)
 	return ERROR;
 }
 
+static void  decrypt_cw_ex(int32_t cid, int32_t ikey1, int32_t ikey2, int32_t ikey3, uchar *buf)
+{
+        uchar key1[16] = {0xB5, 0xD5, 0xE8, 0x8A, 0x09, 0x98, 0x5E, 0xD0, 0xDA, 0xEE, 0x3E, 0xC3, 0x30, 0xB9, 0xCA, 0x37};
+        uchar key2[16] = {0x5F, 0xE2, 0x76, 0xF8, 0x04, 0xCB, 0x5A, 0x24, 0x79, 0xF9, 0xC9, 0x7F, 0x23, 0x21, 0x45, 0x87};
+        uchar key3[16] = {0xE3, 0x78, 0xB9, 0x8C, 0x74, 0x55, 0xBC, 0xEE, 0x03, 0x85, 0xFD, 0xA0, 0x2A, 0x86, 0xEF, 0xB3};
+	uchar keybuf[22] = {0xCC,0x65,0xE0, 0xCB,0x60,0x62,0x06,0x33,0x87,0xE3,0xB5,0x2D,0x4B,0x12,0x90,0xD9,0x00,0x00,0x00,0x00,0x00,0x00};
+	uchar md5key[16];
+	uchar md5tmp[20];
+	uchar deskey1[8], deskey2[8];
+
+	//decrypt_cw;
+	if(cid == 0x100)
+		memcpy(keybuf,key1,sizeof(key1));
+	else if(cid == 0x101)
+		memcpy(keybuf,key2,sizeof(key2));
+	else if(cid == 0x47)
+		memcpy(keybuf,key3,sizeof(key3));
+	keybuf[16] = (ikey3 >> 24) & 0xFF;
+	keybuf[17] = (ikey1 >> 8) & 0xFF;
+	keybuf[18] = (ikey3 >> 16) & 0xFF;
+	keybuf[19] = (ikey3 >> 8) & 0xFF;
+	keybuf[20] = ikey3 & 0xFF;
+	keybuf[21] = ikey1 & 0xFF;
+	MD5(keybuf,22,md5tmp);
+	md5tmp[16] = (ikey2 >> 8)& 0xFF;
+	md5tmp[17] = ikey2 & 0xFF;
+	md5tmp[18] = (ikey1 >> 8) & 0xFF;
+	md5tmp[19] = ikey1 & 0xff;
+	MD5(md5tmp,20,md5key);
+
+	//3des decrypt
+	memcpy(deskey1, md5key, 8);
+	memcpy(deskey2, md5key + 8, 8);
+	des_ecb_decrypt(buf, deskey1, 16);  //decrypt
+	des_ecb_encrypt(buf, deskey2, 16);  //crypt
+	des_ecb_decrypt(buf, deskey1, 16);  //decrypt
+}
+
 static int32_t streamguard_read_data(struct s_reader *reader, uchar size, uchar *cta_res, uint16_t *status)
 {
 	static uchar read_data_cmd[]={0x00,0xc0,0x00,0x00,0xff};
@@ -205,7 +243,7 @@ E1 70 71 20 C7 FB 35 B1 EC 32 02 5C 0C 7E 04 CC
 */
 static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er, struct s_ecm_answer *ea)
 {
-	uchar ecm_cmd[200] = {0x80,0x32,0x00,0x00,0x3C};
+	uchar ecm_cmd[256] = {0x80,0x32,0x00,0x00,0x3C};
 	uchar data[256];
 	int32_t ecm_len;
 	uchar* pbuf;
@@ -257,11 +295,11 @@ static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er
 	for(i = 0, pbuf=data; i < (data_len - 1); i++)
 	{
 		if (reader->cas_version == 3 && pbuf[0] == 0xB4 && pbuf[1] == 0x04)
-			cid = (((uint16_t)pbuf[4]) << 8) + pbuf[5];
+			cid = b2i(2, pbuf + 4);
 ;
 		if (pbuf[0] == 0x83 && pbuf[1] == 0x16)
 		{
-			if(reader->cas_version == 3 && pbuf[2] != 0 && pbuf[3] != 1)
+			if(reader->cas_version == 3 && (pbuf[2] != 0 || pbuf[3] != 1))
 				break;
 		}
 		pbuf++;
@@ -299,43 +337,9 @@ static int32_t streamguard_do_ecm(struct s_reader *reader, const ECM_REQUEST *er
 	}
 
 	if(cid == 0x120 || cid == 0x100 || cid == 0x10A || cid == 0x101 || cid == 0x47){
-	        uchar key1[16] = {0xB5, 0xD5, 0xE8, 0x8A, 0x09, 0x98, 0x5E, 0xD0, 0xDA, 0xEE, 0x3E, 0xC3, 0x30, 0xB9, 0xCA, 0x37};
-	        uchar key2[16] = {0x5F, 0xE2, 0x76, 0xF8, 0x04, 0xCB, 0x5A, 0x24, 0x79, 0xF9, 0xC9, 0x7F, 0x23, 0x21, 0x45, 0x87};
-	        uchar key3[16] = {0xE3, 0x78, 0xB9, 0x8C, 0x74, 0x55, 0xBC, 0xEE, 0x03, 0x85, 0xFD, 0xA0, 0x2A, 0x86, 0xEF, 0xB3};
-		uchar keybuf[22] = {0xCC,0x65,0xE0, 0xCB,0x60,0x62,0x06,0x33,0x87,0xE3,0xB5,0x2D,0x4B,0x12,0x90,0xD9,0x00,0x00,0x00,0x00,0x00,0x00};
-		uchar md5key[16];
-		uchar md5tmp[20];
-		uchar deskey1[8], deskey2[8];
-
-		//decrypt_cw;
-		if(cid == 0x100)
-			memcpy(keybuf,key1,sizeof(key1));
-		else if(cid == 0x101)
-			memcpy(keybuf,key2,sizeof(key2));
-		else if(cid == 0x47)
-			memcpy(keybuf,key3,sizeof(key3));
-		keybuf[16] = (((uint32_t)cid) >> 24) & 0xFF;
-		keybuf[17] = (((((uint16_t)pbuf[0]) << 8) + pbuf[1]) >> 8) & 0xFF;
-		keybuf[18] =  (((uint32_t)cid) >> 16) & 0xFF;
-		keybuf[19] =  (((uint32_t)cid) >> 8) & 0xFF;
-		keybuf[20] =  ((uint32_t)cid) & 0xFF;
-		keybuf[21] = ((((uint16_t)pbuf[0]) << 8) + pbuf[1]) & 0xFF;
-
-		MD5(keybuf,22,md5tmp);
-
-		md5tmp[16] = (((((uint16_t)pbuf[2]) << 8) + pbuf[3]) >> 8) & 0xFF;
-		md5tmp[17] = ((((uint16_t)pbuf[2]) << 8) + pbuf[3]) & 0xFF;
-		md5tmp[18] = (((((uint16_t)pbuf[0]) << 8) + pbuf[1]) >> 8) & 0xFF;
-		md5tmp[19] = ((((uint16_t)pbuf[0]) << 8) + pbuf[1]) & 0xff;
-		MD5(md5tmp,20,md5key);
-
-		//3des decrypt
-		memcpy(deskey1, md5key, 8);
-		memcpy(deskey2, md5key + 8, 8);
-		des_ecb_decrypt(ea->cw, deskey1, sizeof(ea->cw));  //decrypt
-		des_ecb_encrypt(ea->cw, deskey2, sizeof(ea->cw));  //crypt
-		des_ecb_decrypt(ea->cw, deskey1, sizeof(ea->cw));  //decrypt
-
+		int32_t ikey1=b2i(2, pbuf);
+		int32_t ikey2=b2i(2, pbuf + 2);
+		decrypt_cw_ex(cid, ikey1, ikey2, cid, ea->cw);
 	}
 	return OK;
 }
