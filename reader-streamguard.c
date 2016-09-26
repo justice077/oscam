@@ -368,6 +368,11 @@ static int32_t streamguard_do_emm(struct s_reader *reader, EMM_PACKET *ep)
 		return ERROR;
 	}
 
+	if(reader->cas_version > 2 && ep->emm[0] == 0x83){
+		rdr_log(reader, "Receive refresh cmd");
+		return ERROR;
+	}
+
 	len = SCT_LEN(ep->emm);
 	emm_cmd[4] = len;
 	memcpy(emm_cmd + 5, ep->emm, len);
